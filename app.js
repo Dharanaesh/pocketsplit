@@ -485,7 +485,7 @@ function renderHome(stats) {
     const recent = [...state.expenses].reverse().slice(0, 4);
     const container = document.getElementById('recent-expenses-list');
     if(recent.length === 0) {
-        container.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><p>No expenses yet</p></div>`;
+        container.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><line x1="12" y1="8" x2="12" y2="12" stroke-width="2"></line><line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"></line></svg><p>No expenses yet</p></div>`;
     } else {
         container.innerHTML = recent.map(tx => buildExpenseRow(tx)).join('');
     }
@@ -496,12 +496,12 @@ function renderExpenses() {
     const month = document.getElementById('expense-month').value;
     
     let filtered = [...state.expenses].reverse().filter(tx => {
-        return tx.desc.toLowerCase().includes(search) && (!month || tx.date.startsWith(month));
+        return (tx.desc || '').toLowerCase().includes(search) && (!month || tx.date.startsWith(month));
     });
     
     const container = document.getElementById('expenses-list');
     if(filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><p>No expenses found</p></div>`;
+        container.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8" stroke-width="2"></circle><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"></line></svg><p>No expenses found</p></div>`;
     } else {
         container.innerHTML = filtered.map(tx => buildExpenseRow(tx, true)).join('');
     }
@@ -662,6 +662,14 @@ function renderAnalytics(stats) {
     pie.style.background = `conic-gradient(${grad.slice(0, -2)})`;
 }
 
+// We MUST safely attach the onclick behavior without causing syntax errors.
+function setupDynamicModals() {
+    const categoryManageBtn = document.getElementById('modal-category-manage-btn');
+    if (categoryManageBtn) {
+        categoryManageBtn.addEventListener('click', renderManageCategories);
+    }
+}
+
 function renderManageCategories() {
     const list = document.getElementById('category-manage-list');
     list.innerHTML = state.categories.map(c => `
@@ -674,9 +682,6 @@ function renderManageCategories() {
         </div>
     `).join('');
 }
-
-// Ensure category management modal populates on open
-document.querySelector('[onclick="openModal('modal-category-manage')"]').addEventListener('click', renderManageCategories);
 
 
 // --- DATA ---
@@ -712,4 +717,7 @@ function clearAllData() {
 }
 
 // Boot
-window.onload = init;
+window.onload = () => {
+    init();
+    setupDynamicModals();
+};
