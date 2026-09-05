@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TrackIt - Expense & Splits</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <meta name="theme-color" content="#121212">
+</head>
+<body>
+    <!-- Top Header -->
+    <header id="main-header">
+        <h1 id="header-title">Dashboard</h1>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="app-content">
+        
+        <!-- DASHBOARD VIEW -->
+        <section id="view-dashboard" class="view active">
+            <div class="card summary-card">
+                <h3>This Month's Spend</h3>
+                <h2 id="dash-total-spend">₹0</h2>
+                <div class="split-summary">
+                    <span>You are owed: <strong id="dash-total-owed" class="text-green">₹0</strong></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Category Analysis</h3>
+                <div id="category-bars">
+                    <!-- Bars injected by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- EXPENSES VIEW -->
+        <section id="view-expenses" class="view">
+            <div class="month-selector">
+                <input type="month" id="expense-month-filter" onchange="renderExpenses()">
+            </div>
+            <div id="expense-list" class="list-container">
+                <!-- Expenses injected by JS -->
+            </div>
+            <button class="fab" onclick="openModal('modal-add-expense')">+</button>
+        </section>
+
+        <!-- SPLITS / FRIENDS VIEW -->
+        <section id="view-splits" class="view">
+            <div class="card">
+                <div class="flex-between">
+                    <h3>Friends & Splits</h3>
+                    <button class="btn-small" onclick="openModal('modal-add-friend')">+ Add Friend</button>
+                </div>
+            </div>
+            <div id="splits-list" class="list-container">
+                <!-- Splits injected by JS -->
+            </div>
+        </section>
+
+        <!-- SETTINGS VIEW -->
+        <section id="view-settings" class="view">
+            <div class="card">
+                <h3>Data Management</h3>
+                <p class="text-muted">Since this app runs entirely on your device, you can export your data to back it up, or import it on another device.</p>
+                <div class="settings-actions">
+                    <button class="btn primary" onclick="exportData()">📤 Export Data (JSON)</button>
+                    
+                    <label class="btn secondary" style="display: block; text-align: center; margin-top: 10px;">
+                        📥 Import Data
+                        <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importData(event)">
+                    </label>
+                </div>
+            </div>
+            <div class="card danger-zone">
+                <h3>Danger Zone</h3>
+                <button class="btn danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('dashboard', this)">📊<br>Dash</button>
+        <button class="nav-item" onclick="switchTab('expenses', this)">💸<br>Expenses</button>
+        <button class="nav-item" onclick="switchTab('splits', this)">🤝<br>Splits</button>
+        <button class="nav-item" onclick="switchTab('settings', this)">⚙️<br>Settings</button>
+    </nav>
+
+    <!-- MODALS -->
+    <!-- Add Expense Modal -->
+    <div id="modal-add-expense" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modal-add-expense')">&times;</span>
+            <h2>Add Expense</h2>
+            <form id="form-expense" onsubmit="handleExpenseSubmit(event)">
+                <input type="number" id="exp-amount" placeholder="Amount (₹)" required>
+                <input type="text" id="exp-desc" placeholder="Description (e.g. Dinner at KFC)" required>
+                <input type="date" id="exp-date" required>
+                
+                <select id="exp-category" required>
+                    <option value="" disabled selected>Select Category</option>
+                    <option value="Food">Food & Dining</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Bills">Bills & Utilities</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <div class="split-section">
+                    <label>
+                        <input type="checkbox" id="exp-is-split" onchange="toggleSplitFields()"> 
+                        Split this with someone?
+                    </label>
+                    <div id="split-fields" style="display: none; margin-top: 10px;">
+                        <select id="exp-split-person">
+                            <!-- Friends injected by JS -->
+                        </select>
+                        <input type="number" id="exp-split-amount" placeholder="Amount they owe you (₹)">
+                        <label style="font-size: 0.9em; display:flex; gap: 5px; align-items:center;">
+                            <input type="checkbox" id="exp-gpay-status"> Requested on GPay?
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn primary w-100" style="margin-top: 15px;">Save Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Friend Modal -->
+    <div id="modal-add-friend" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('modal-add-friend')">&times;</span>
+            <h2>Add Friend</h2>
+            <form id="form-friend" onsubmit="handleAddFriend(event)">
+                <input type="text" id="friend-name" placeholder="Friend's Name" required>
+                <button type="submit" class="btn primary w-100" style="margin-top: 10px;">Save Friend</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
