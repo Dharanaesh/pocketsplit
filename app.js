@@ -16,7 +16,7 @@ let state = {
 };
 
 // --- CORE UTILS ---
-const formatCurrency = (amount) => '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+const formatCurrency = (amount) => '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const showToast = (msg) => {
     const t = document.getElementById('toast');
     t.innerText = msg;
@@ -119,7 +119,6 @@ function openModal(id) {
 }
 
 function closeAllModals() {
-    // Bulletproof close failsafe - hides all modals immediately
     document.querySelectorAll('.modal').forEach(m => {
         m.classList.remove('show');
         setTimeout(() => m.style.display = 'none', 300);
@@ -144,24 +143,22 @@ function getBalances() {
     state.expenses.forEach(tx => {
         const isCurrMonth = tx.date.startsWith(currMonth);
         
-        if (tx.isSettlement) {
-            if(balances[tx.personId] !== undefined) balances[tx.personId] -= tx.amount;
-        } else {
-            let myShare = tx.amount;
-            
-            if (tx.splits && tx.splits.length > 0) {
-                let friendsShareTotal = 0;
-                tx.splits.forEach(s => {
-                    friendsShareTotal += s.amount;
-                    if(balances[s.personId] !== undefined) balances[s.personId] += s.amount;
-                });
-                myShare = tx.amount - friendsShareTotal;
-            }
+        let myShare = tx.amount;
+        
+        if (tx.splits && tx.splits.length > 0) {
+            let friendsShareTotal = 0;
+            tx.splits.forEach(s => {
+                friendsShareTotal += s.amount;
+                if(!s.settled && balances[s.personId] !== undefined) {
+                    balances[s.personId] += s.amount;
+                }
+            });
+            myShare = tx.amount - friendsShareTotal;
+        }
 
-            if (isCurrMonth) {
-                monthTotalPaid += tx.amount;
-                monthMySpend += myShare;
-            }
+        if (isCurrMonth) {
+            monthTotalPaid += tx.amount;
+            monthMySpend += myShare;
         }
     });
 
@@ -199,7 +196,7 @@ function renderSplitMembers() {
         <div class="split-row">
             <input type="checkbox" class="split-cb checkbox-custom" value="${p.id}" checked onchange="calculateSplits()">
             <span class="flex-1 font-medium">${p.name}</span>
-            <input type="number" class="split-val input-standard p-0 text-right border-0" data-id="${p.id}" placeholder="0" oninput="handleManualSplit()">
+            <input type="number" class="split-val input-standard p-0 text-right border-0" data-id="${p.id}" placeholder="0" step="any" oninput="handleManualSplit()">
         </div>
     `).join('');
 }
@@ -236,7 +233,8 @@ function updateSplitTotal() {
     
     const label = document.getElementById('split-total-amount');
     label.innerText = formatCurrency(allocated);
-    label.className = allocated > total ? 'text-danger font-bold' : 'text-primary font-bold';
+    // Float comparison allowance
+    label.className = (allocated > total + 0.05) ? 'text-danger font-bold' : 'text-primary font-bold';
 }
 
 function populateCategoriesDropdown() {
@@ -250,7 +248,7 @@ function populateCategoriesDropdown() {
 
 function openExpenseModal(id = null) {
     const form = document.getElementById('form-expense');
-    form.reset();
+    if(form) form.reset();
     document.getElementById('exp-id').value = id || '';
     document.getElementById('modal-expense-title').innerText = id ? 'Edit Expense' : 'Add Expense';
     
@@ -294,6 +292,8 @@ function saveExpense(e) {
     const id = document.getElementById('exp-id').value || 'tx_' + Date.now();
     const amount = parseFloat(document.getElementById('exp-amount').value);
     
+    const existing = state.expenses.find(t => t.id === id);
+
     let splits = [];
     if(document.getElementById('exp-is-split').checked) {
         document.querySelectorAll('.split-row').forEach(r => {
@@ -301,26 +301,36 @@ function saveExpense(e) {
                 const pId = r.querySelector('.split-val').dataset.id;
                 let val = parseFloat(r.querySelector('.split-val').value) || 0;
                 if(splitType === 'percent') val = amount * (val/100);
-                splits.push({ personId: pId, amount: val });
+                
+                let settled = false;
+                let gpaySent = false;
+                if(existing && existing.splits) {
+                    const os = existing.splits.find(s => s.personId === pId);
+                    if(os) { settled = os.settled || false; gpaySent = os.gpaySent || false; }
+                }
+
+                splits.push({ personId: pId, amount: val, settled, gpaySent });
             }
         });
     }
 
     const allocated = splits.reduce((sum, s) => sum + s.amount, 0);
-    if(allocated > amount) return alert("Splits cannot exceed total expense.");
+    if(allocated > amount + 0.05) return alert("Splits cannot exceed total expense.");
 
     const tx = {
         id, amount,
         desc: document.getElementById('exp-desc').value,
         categoryId: document.getElementById('exp-category').value,
         date: document.getElementById('exp-date').value,
-        splits,
-        isSettlement: false
+        splits
     };
 
-    const idx = state.expenses.findIndex(t => t.id === id);
-    if(idx > -1) state.expenses[idx] = tx;
-    else state.expenses.push(tx);
+    if(existing) {
+        const idx = state.expenses.findIndex(t => t.id === id);
+        state.expenses[idx] = tx;
+    } else {
+        state.expenses.push(tx);
+    }
 
     closeAllModals();
     saveData();
@@ -345,36 +355,30 @@ function savePerson(e) {
 }
 
 function deletePerson(id) {
-    if(confirm("Archive this person?")) {
+    if(confirm("Remove this person completely?")) {
         state.people = state.people.filter(p => p.id !== id);
         saveData();
         showToast("Person removed");
     }
 }
 
-function openSettleModal(pId) {
-    document.getElementById('settle-friend-id').value = pId;
-    const balances = getBalances().balances;
-    document.getElementById('settle-outstanding').innerText = formatCurrency(balances[pId] || 0);
-    document.getElementById('settle-amount').value = '';
-    openModal('modal-settle');
+function markSettled(txId, personId) {
+    const tx = state.expenses.find(t => t.id === txId);
+    if(tx && tx.splits) {
+        const s = tx.splits.find(s => s.personId === personId);
+        if(s) s.settled = true;
+    }
+    saveData();
+    showToast("Marked as settled");
 }
 
-function saveSettlement(e) {
-    e.preventDefault();
-    const pId = document.getElementById('settle-friend-id').value;
-    const amount = parseFloat(document.getElementById('settle-amount').value);
-    
-    state.expenses.push({
-        id: 'tx_set_' + Date.now(),
-        amount, desc: "Settlement", categoryId: null,
-        date: new Date().toISOString().split('T')[0],
-        personId: pId, isSettlement: true
-    });
-    
-    closeAllModals();
+function toggleGPay(txId, personId) {
+    const tx = state.expenses.find(t => t.id === txId);
+    if(tx && tx.splits) {
+        const s = tx.splits.find(s => s.personId === personId);
+        if(s) s.gpaySent = !s.gpaySent;
+    }
     saveData();
-    showToast("Settlement recorded");
 }
 
 // --- CATEGORIES & BUDGET ---
@@ -460,24 +464,6 @@ function renderExpenses() {
 }
 
 function buildExpenseRow(tx, showEdit = false) {
-    if (tx.isSettlement) {
-        const p = state.people.find(x => x.id === tx.personId) || {name: 'Unknown'};
-        return `
-            <div class="list-item card m-0 border-0 shadow-sm">
-                <div class="flex-row align-center gap-sm">
-                    <div class="icon-container bg-success-light text-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
-                    <div>
-                        <div class="font-medium text-primary">Settlement from ${p.name}</div>
-                        <div class="text-sm text-secondary">${tx.date}</div>
-                    </div>
-                </div>
-                <div class="flex-col align-end">
-                    <span class="font-bold text-success">+${formatCurrency(tx.amount)}</span>
-                    ${showEdit ? `<button class="text-btn text-danger p-0 mt-xs" onclick="deleteExpense('${tx.id}')">Delete</button>` : ''}
-                </div>
-            </div>`;
-    }
-
     const cat = state.categories.find(c => c.id === tx.categoryId) || {name: 'Other', color: '#888', icon: '<circle cx="12" cy="12" r="10"></circle>'};
     const splitBadge = (tx.splits && tx.splits.length > 0) ? `<span class="item-status text-primary font-medium" style="background:var(--primary-light); padding: 2px 6px; border-radius:4px; font-size:11px;">Split</span>` : '';
 
@@ -509,9 +495,36 @@ function renderSettlements(balances) {
         const bal = balances[p.id] || 0;
         if(bal > 0) totalOwed += bal;
         
-        let status = bal === 0 ? '<span class="text-secondary font-medium">Settled</span>' : 
-                    (bal > 0 ? `<span class="text-success font-medium">Owes you ${formatCurrency(bal)}</span>` : 
-                               `<span class="text-danger font-medium">You owe ${formatCurrency(Math.abs(bal))}</span>`);
+        let pendingSplits = [];
+        state.expenses.forEach(tx => {
+            if(tx.splits) {
+                const s = tx.splits.find(sp => sp.personId === p.id && !sp.settled);
+                if(s) pendingSplits.push({ tx, split: s });
+            }
+        });
+
+        let status = bal === 0 ? '<span class="text-secondary font-medium">Settled up</span>' : 
+                     `<span class="text-danger font-bold">Owes you ${formatCurrency(bal)}</span>`;
+
+        let splitsHtml = '';
+        if(pendingSplits.length > 0) {
+            splitsHtml = pendingSplits.map(ps => {
+                const gpayClass = ps.split.gpaySent ? 'bg-success-light text-success' : 'bg-secondary text-secondary';
+                const gpayText = ps.split.gpaySent ? 'GPay Sent' : 'Mark GPay Sent';
+                return `
+                    <div class="flex-between align-center py-sm border-top">
+                        <div>
+                            <div class="font-medium text-sm">${ps.tx.desc}</div>
+                            <div class="text-xs text-muted">${ps.tx.date} • ${formatCurrency(ps.split.amount)}</div>
+                        </div>
+                        <div class="flex-row gap-xs">
+                            <button class="btn-sm font-medium ${gpayClass} border-0 rounded-full cursor-pointer" onclick="toggleGPay('${ps.tx.id}', '${p.id}')">${gpayText}</button>
+                            <button class="btn-sm bg-primary text-white border-0 rounded-full cursor-pointer" onclick="markSettled('${ps.tx.id}', '${p.id}')">Settle</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
 
         return `
             <div class="card p-md shadow-sm">
@@ -520,12 +533,12 @@ function renderSettlements(balances) {
                         <div class="icon-container bg-light text-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
                         <span class="font-bold" style="font-size:1.1rem;">${p.name}</span>
                     </div>
-                    ${status}
+                    <div class="flex-row align-center gap-sm">
+                        ${status}
+                        <button class="icon-btn text-danger ml-sm" onclick="deletePerson('${p.id}')" title="Remove Person"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                    </div>
                 </div>
-                <div class="flex-row gap-sm border-top pt-sm">
-                    <button class="btn btn-secondary flex-1 py-sm text-sm" onclick="openSettleModal('${p.id}')">Record Payment</button>
-                    <button class="btn-ghost text-danger text-sm" onclick="deletePerson('${p.id}')">Remove</button>
-                </div>
+                ${splitsHtml ? `<div class="mt-md">${splitsHtml}</div>` : ''}
             </div>`;
     }).join('');
 
@@ -540,7 +553,7 @@ function renderAnalytics(stats) {
     let catTotals = {};
     
     state.expenses.forEach(tx => {
-        if (!tx.isSettlement && tx.date.startsWith(currMonth)) {
+        if (tx.date.startsWith(currMonth)) {
             let myShare = tx.amount;
             if(tx.splits) tx.splits.forEach(s => myShare -= s.amount);
             if(myShare > 0) {
@@ -584,7 +597,7 @@ function renderAnalytics(stats) {
 }
 
 function renderManageCategories() {
-    populateCategoriesDropdown(); // Ensure global dropdown is synced
+    populateCategoriesDropdown();
     const list = document.getElementById('category-manage-list');
     list.innerHTML = state.categories.map(c => `
         <div class="list-item">
