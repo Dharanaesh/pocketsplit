@@ -16,7 +16,7 @@ let state = {
 };
 
 // --- CORE UTILS ---
-const formatCurrency = (amount) => '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const formatCurrency = (amount) => '₹' + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 const showToast = (msg) => {
     const t = document.getElementById('toast');
     t.innerText = msg;
@@ -26,9 +26,31 @@ const showToast = (msg) => {
 
 // --- AUTH & INIT ---
 function init() {
+    // 1. Prioritize pure auth token check
+    const auth = localStorage.getItem('pocketsplit_auth');
+    if (auth === 'true') {
+        state.isAuthenticated = true;
+    }
+
+    // 2. Load stored data
     const saved = localStorage.getItem('pocketsplit_data');
     if (saved) {
-        try { state = { ...state, ...JSON.parse(saved) }; } catch(e) {}
+        try { 
+            const parsed = JSON.parse(saved);
+            const authState = state.isAuthenticated; // Preserve auth isolated state
+            state = { ...state, ...parsed }; 
+            state.isAuthenticated = authState;
+
+            // Patch existing splits for new line-item settlement logic
+            state.expenses.forEach(tx => {
+                if (tx.splits) {
+                    tx.splits.forEach(s => {
+                        if (s.settled === undefined) s.settled = false;
+                        if (s.gpayRequested === undefined) s.gpayRequested = false;
+                    });
+                }
+            });
+        } catch(e) { console.error("Error parsing backup data.", e); }
     }
     
     applyTheme(state.theme);
@@ -38,9 +60,7 @@ function init() {
     document.getElementById('exp-date').value = today;
     document.getElementById('expense-month').value = today.substring(0, 7);
 
-    // Global category populate so the dropdown is never empty
-    populateCategoriesDropdown();
-
+    // Render if logged in
     if (state.isAuthenticated) {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('app-shell').style.display = '';
@@ -53,6 +73,7 @@ function handleLogin(e) {
     const code = document.getElementById('access-code').value;
     if (code === 'qwert' || code === '12345') {
         state.isAuthenticated = true;
+        localStorage.setItem('pocketsplit_auth', 'true'); // Persist auth explicitly
         saveData();
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('app-shell').style.display = '';
@@ -64,6 +85,7 @@ function handleLogin(e) {
 
 function logout() {
     state.isAuthenticated = false;
+    localStorage.removeItem('pocketsplit_auth');
     saveData();
     location.reload();
 }
@@ -93,20 +115,12 @@ function switchTab(tabId) {
     document.getElementById(`view-${tabId}`).classList.add('active');
     document.querySelectorAll(`.nav-item[data-target="${tabId}"]`).forEach(n => n.classList.add('active'));
     
-    const titles = { 
-        'home': 'Home', 
-        'expenses': 'Expenses', 
-        'settlements': 'Settlements', 
-        'analytics': 'Analytics', 
-        'settings': 'Settings',
-        'categories': 'Categories'
-    };
+    const titles = { 'home': 'Home', 'expenses': 'Expenses', 'settlements': 'Settlements', 'analytics': 'Analytics', 'settings': 'Settings' };
     document.getElementById('header-title').innerText = titles[tabId];
 }
 
 // --- MODALS ---
 let activeModal = null;
-
 function openModal(id) {
     document.getElementById('overlay').style.display = 'block';
     const modal = document.getElementById(id);
@@ -119,21 +133,20 @@ function openModal(id) {
 }
 
 function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(m => {
-        m.classList.remove('show');
-        setTimeout(() => m.style.display = 'none', 300);
-    });
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.style.display = 'none', 300);
-    }
-    activeModal = null;
+    if (!activeModal) return;
+    const modal = document.getElementById(activeModal);
+    modal.classList.remove('show');
+    document.getElementById('overlay').style.opacity = '0';
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        activeModal = null;
+    }, 300);
 }
 
 // --- CALCULATION ENGINE ---
 function getBalances() {
-    let balances = {}; 
+    let balances = {}; // { personId: amount_owed_to_me }
     state.people.forEach(p => balances[p.id] = 0);
     
     let monthTotalPaid = 0;
@@ -143,22 +156,31 @@ function getBalances() {
     state.expenses.forEach(tx => {
         const isCurrMonth = tx.date.startsWith(currMonth);
         
-        let myShare = tx.amount;
-        
-        if (tx.splits && tx.splits.length > 0) {
-            let friendsShareTotal = 0;
-            tx.splits.forEach(s => {
-                friendsShareTotal += s.amount;
-                if(!s.settled && balances[s.personId] !== undefined) {
-                    balances[s.personId] += s.amount;
-                }
-            });
-            myShare = tx.amount - friendsShareTotal;
-        }
+        // Ensure backward compatibility with old general settlements
+        if (tx.isSettlement) {
+            if (!tx.isLineItemSettle) { 
+                if(balances[tx.personId] !== undefined) balances[tx.personId] -= tx.amount;
+            }
+        } else {
+            // Normal expense
+            let myShare = tx.amount;
+            
+            if (tx.splits && tx.splits.length > 0) {
+                let friendsShareTotal = 0;
+                tx.splits.forEach(s => {
+                    friendsShareTotal += s.amount;
+                    // Only add to owed balance if it hasn't been line-item settled
+                    if (!s.settled && balances[s.personId] !== undefined) {
+                        balances[s.personId] += s.amount;
+                    }
+                });
+                myShare = tx.amount - friendsShareTotal;
+            }
 
-        if (isCurrMonth) {
-            monthTotalPaid += tx.amount;
-            monthMySpend += myShare;
+            if (isCurrMonth) {
+                monthTotalPaid += tx.amount;
+                monthMySpend += myShare;
+            }
         }
     });
 
@@ -195,8 +217,8 @@ function renderSplitMembers() {
     list.innerHTML = state.people.map(p => `
         <div class="split-row">
             <input type="checkbox" class="split-cb checkbox-custom" value="${p.id}" checked onchange="calculateSplits()">
-            <span class="flex-1 font-medium">${p.name}</span>
-            <input type="number" class="split-val input-standard p-0 text-right border-0" data-id="${p.id}" placeholder="0" step="any" oninput="handleManualSplit()">
+            <span class="flex-1">${p.name}</span>
+            <input type="number" class="split-val input-standard p-0 text-right border-0" data-id="${p.id}" placeholder="0" oninput="handleManualSplit()">
         </div>
     `).join('');
 }
@@ -214,6 +236,7 @@ function calculateSplits() {
     if (checked.length === 0) { updateSplitTotal(); return; }
 
     if (splitType === 'equal') {
+        // Equal split implies splitting among checked friends + ME
         const amt = (total / (checked.length + 1)).toFixed(2);
         checked.forEach(r => r.querySelector('.split-val').value = amt);
     }
@@ -233,26 +256,20 @@ function updateSplitTotal() {
     
     const label = document.getElementById('split-total-amount');
     label.innerText = formatCurrency(allocated);
-    // Float comparison allowance
-    label.className = (allocated > total + 0.05) ? 'text-danger font-bold' : 'text-primary font-bold';
-}
-
-function populateCategoriesDropdown() {
-    const el = document.getElementById('exp-category');
-    if (el) {
-        const currentVal = el.value;
-        el.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-        if (currentVal) el.value = currentVal;
-    }
+    label.className = allocated > total ? 'text-danger font-bold' : 'text-primary font-bold';
 }
 
 function openExpenseModal(id = null) {
     const form = document.getElementById('form-expense');
-    if(form) form.reset();
+    form.reset();
     document.getElementById('exp-id').value = id || '';
     document.getElementById('modal-expense-title').innerText = id ? 'Edit Expense' : 'Add Expense';
     
-    populateCategoriesDropdown();
+    // Toggle Delete Button
+    document.getElementById('btn-delete-expense').style.display = id ? 'block' : 'none';
+    
+    // Categories
+    document.getElementById('exp-category').innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     document.getElementById('split-section').style.display = 'none';
 
     if (id) {
@@ -292,7 +309,10 @@ function saveExpense(e) {
     const id = document.getElementById('exp-id').value || 'tx_' + Date.now();
     const amount = parseFloat(document.getElementById('exp-amount').value);
     
-    const existing = state.expenses.find(t => t.id === id);
+    // Keep existing settled states if editing
+    let existingSplits = [];
+    const existingTx = state.expenses.find(t => t.id === id);
+    if (existingTx) existingSplits = existingTx.splits || [];
 
     let splits = [];
     if(document.getElementById('exp-is-split').checked) {
@@ -302,44 +322,49 @@ function saveExpense(e) {
                 let val = parseFloat(r.querySelector('.split-val').value) || 0;
                 if(splitType === 'percent') val = amount * (val/100);
                 
-                let settled = false;
-                let gpaySent = false;
-                if(existing && existing.splits) {
-                    const os = existing.splits.find(s => s.personId === pId);
-                    if(os) { settled = os.settled || false; gpaySent = os.gpaySent || false; }
+                let isSettled = false;
+                let isGpay = false;
+                const oldSplit = existingSplits.find(s => s.personId === pId);
+                if (oldSplit) {
+                    isSettled = oldSplit.settled;
+                    isGpay = oldSplit.gpayRequested;
                 }
 
-                splits.push({ personId: pId, amount: val, settled, gpaySent });
+                splits.push({ personId: pId, amount: val, settled: isSettled, gpayRequested: isGpay });
             }
         });
     }
 
     const allocated = splits.reduce((sum, s) => sum + s.amount, 0);
-    if(allocated > amount + 0.05) return alert("Splits cannot exceed total expense.");
+    if(allocated > amount) return alert("Splits cannot exceed total expense.");
 
     const tx = {
         id, amount,
         desc: document.getElementById('exp-desc').value,
         categoryId: document.getElementById('exp-category').value,
         date: document.getElementById('exp-date').value,
-        splits
+        splits,
+        isSettlement: false
     };
 
-    if(existing) {
-        const idx = state.expenses.findIndex(t => t.id === id);
-        state.expenses[idx] = tx;
-    } else {
-        state.expenses.push(tx);
-    }
+    const idx = state.expenses.findIndex(t => t.id === id);
+    if(idx > -1) state.expenses[idx] = tx;
+    else state.expenses.push(tx);
 
     closeAllModals();
     saveData();
     showToast("Expense saved");
 }
 
+function deleteExpenseFromModal() {
+    const id = document.getElementById('exp-id').value;
+    if(id) deleteExpense(id);
+}
+
 function deleteExpense(id) {
     if(confirm("Delete this expense permanently?")) {
         state.expenses = state.expenses.filter(t => t.id !== id);
+        closeAllModals();
         saveData();
         showToast("Expense deleted");
     }
@@ -355,30 +380,48 @@ function savePerson(e) {
 }
 
 function deletePerson(id) {
-    if(confirm("Remove this person completely?")) {
+    if(confirm("Archive this person?")) {
         state.people = state.people.filter(p => p.id !== id);
         saveData();
         showToast("Person removed");
     }
 }
 
-function markSettled(txId, personId) {
+// New Individual Line-Item Settle Logic
+function settleSpecific(txId, personId, amount) {
     const tx = state.expenses.find(t => t.id === txId);
-    if(tx && tx.splits) {
-        const s = tx.splits.find(s => s.personId === personId);
-        if(s) s.settled = true;
+    if (tx && tx.splits) {
+        const split = tx.splits.find(s => s.personId === personId);
+        if (split) {
+            split.settled = true;
+            // Record historical settlement to track that they paid
+            state.expenses.push({
+                id: 'tx_set_' + Date.now(),
+                amount: amount,
+                desc: `Settled: ${tx.desc}`,
+                categoryId: null,
+                date: new Date().toISOString().split('T')[0],
+                personId: personId,
+                isSettlement: true,
+                isLineItemSettle: true // Prevents double reduction in balance calculator
+            });
+            saveData();
+            showToast("Marked as settled");
+        }
     }
-    saveData();
-    showToast("Marked as settled");
 }
 
-function toggleGPay(txId, personId) {
+// Visual GPay Status Logic
+function markGPaySplit(txId, personId) {
     const tx = state.expenses.find(t => t.id === txId);
-    if(tx && tx.splits) {
-        const s = tx.splits.find(s => s.personId === personId);
-        if(s) s.gpaySent = !s.gpaySent;
+    if (tx && tx.splits) {
+        const split = tx.splits.find(s => s.personId === personId);
+        if (split) {
+            split.gpayRequested = true;
+            saveData();
+            showToast("GPay status updated");
+        }
     }
-    saveData();
 }
 
 // --- CATEGORIES & BUDGET ---
@@ -392,12 +435,14 @@ function addCategory(e) {
     });
     document.getElementById('new-cat-name').value = '';
     saveData();
+    renderManageCategories();
 }
 
 function deleteCategory(id) {
     if(confirm("Delete category?")) {
         state.categories = state.categories.filter(c => c.id !== id);
         saveData();
+        renderManageCategories();
     }
 }
 
@@ -423,7 +468,6 @@ function renderAll() {
     renderExpenses();
     renderSettlements(stats.balances);
     renderAnalytics(stats);
-    renderManageCategories();
 }
 
 function renderHome(stats) {
@@ -464,8 +508,25 @@ function renderExpenses() {
 }
 
 function buildExpenseRow(tx, showEdit = false) {
+    if (tx.isSettlement) {
+        const p = state.people.find(x => x.id === tx.personId) || {name: 'Unknown'};
+        return `
+            <div class="list-item card m-0 border-0 shadow-sm">
+                <div class="flex-row align-center gap-sm">
+                    <div class="icon-container bg-success-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+                    <div>
+                        <div class="font-medium">${tx.desc || `Settlement from ${p.name}`}</div>
+                        <div class="text-sm text-secondary">${tx.date}</div>
+                    </div>
+                </div>
+                <div class="flex-col align-end">
+                    <span class="font-bold text-success">+${formatCurrency(tx.amount)}</span>
+                </div>
+            </div>`;
+    }
+
     const cat = state.categories.find(c => c.id === tx.categoryId) || {name: 'Other', color: '#888', icon: '<circle cx="12" cy="12" r="10"></circle>'};
-    const splitBadge = (tx.splits && tx.splits.length > 0) ? `<span class="item-status text-primary font-medium" style="background:var(--primary-light); padding: 2px 6px; border-radius:4px; font-size:11px;">Split</span>` : '';
+    const splitBadge = (tx.splits && tx.splits.length > 0) ? `<span class="item-status">Split</span>` : '';
 
     return `
         <div class="list-item card m-0 border-0 shadow-sm ${showEdit ? 'clickable' : ''}" ${showEdit ? `onclick="openExpenseModal('${tx.id}')"` : ''}>
@@ -483,6 +544,7 @@ function buildExpenseRow(tx, showEdit = false) {
 function renderSettlements(balances) {
     const list = document.getElementById('people-list');
     let totalOwed = 0;
+    let peopleCount = 0;
     
     if(state.people.length === 0) {
         list.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="2"></path><circle cx="9" cy="7" r="4" stroke-width="2"></circle></svg><p>No friends added.</p></div>`;
@@ -491,59 +553,63 @@ function renderSettlements(balances) {
         return;
     }
 
-    list.innerHTML = state.people.map(p => {
+    let html = '';
+    state.people.forEach(p => {
         const bal = balances[p.id] || 0;
-        if(bal > 0) totalOwed += bal;
+        if(bal > 0) {
+            totalOwed += bal;
+            peopleCount++;
+        }
         
-        let pendingSplits = [];
+        // Grab specific unresolved line items for this person based on UI reference
+        let lineItems = '';
         state.expenses.forEach(tx => {
-            if(tx.splits) {
-                const s = tx.splits.find(sp => sp.personId === p.id && !sp.settled);
-                if(s) pendingSplits.push({ tx, split: s });
+            if (!tx.isSettlement && tx.splits) {
+                const s = tx.splits.find(x => x.personId === p.id && !x.settled);
+                if (s) {
+                    const gpayText = s.gpayRequested ? 'GPay Sent ✓' : 'Mark GPay Sent';
+                    const gpayClass = s.gpayRequested ? 'text-success' : 'text-primary';
+                    lineItems += `
+                        <div class="flex-between align-center border-top pt-sm mt-sm">
+                            <div>
+                                <div class="font-medium text-sm">${tx.desc}</div>
+                                <div class="text-xs text-muted mt-xs">${tx.date}</div>
+                                <div class="text-sm font-medium mt-xs text-secondary">₹${s.amount.toFixed(0)}</div>
+                            </div>
+                            <div class="flex-row gap-xs">
+                                <button class="btn-action-small ${gpayClass}" onclick="markGPaySplit('${tx.id}', '${p.id}')">${gpayText}</button>
+                                <button class="btn-action-small" onclick="settleSpecific('${tx.id}', '${p.id}', ${s.amount})">Settle</button>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         });
 
-        let status = bal === 0 ? '<span class="text-secondary font-medium">Settled up</span>' : 
-                     `<span class="text-danger font-bold">Owes you ${formatCurrency(bal)}</span>`;
+        if (bal !== 0 || lineItems !== '') {
+            let status = bal > 0 ? `<span class="text-danger font-medium">Owes you ${formatCurrency(bal)}</span>` : 
+                                   `<span class="text-success font-medium">You owe ${formatCurrency(Math.abs(bal))}</span>`;
 
-        let splitsHtml = '';
-        if(pendingSplits.length > 0) {
-            splitsHtml = pendingSplits.map(ps => {
-                const gpayClass = ps.split.gpaySent ? 'bg-success-light text-success' : 'bg-secondary text-secondary';
-                const gpayText = ps.split.gpaySent ? 'GPay Sent' : 'Mark GPay Sent';
-                return `
-                    <div class="flex-between align-center py-sm border-top">
-                        <div>
-                            <div class="font-medium text-sm">${ps.tx.desc}</div>
-                            <div class="text-xs text-muted">${ps.tx.date} • ${formatCurrency(ps.split.amount)}</div>
+            html += `
+                <div class="card p-md shadow-sm border-0 mb-md">
+                    <div class="flex-between align-center mb-sm">
+                        <div class="flex-row align-center gap-sm">
+                            <div class="icon-container bg-primary-light text-primary" style="width: 36px; height: 36px; border-radius: 50%;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
+                            <span class="font-bold" style="font-size: 1.1rem;">${p.name}</span>
                         </div>
-                        <div class="flex-row gap-xs">
-                            <button class="btn-sm font-medium ${gpayClass} border-0 rounded-full cursor-pointer" onclick="toggleGPay('${ps.tx.id}', '${p.id}')">${gpayText}</button>
-                            <button class="btn-sm bg-primary text-white border-0 rounded-full cursor-pointer" onclick="markSettled('${ps.tx.id}', '${p.id}')">Settle</button>
+                        <div class="flex-row align-center gap-sm">
+                            ${status}
+                            <button class="icon-btn text-danger" style="width: 32px; height: 32px;" onclick="deletePerson('${p.id}')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                         </div>
                     </div>
-                `;
-            }).join('');
+                    ${lineItems}
+                </div>`;
         }
+    });
 
-        return `
-            <div class="card p-md shadow-sm">
-                <div class="flex-between align-center mb-sm">
-                    <div class="flex-row align-center gap-sm">
-                        <div class="icon-container bg-light text-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
-                        <span class="font-bold" style="font-size:1.1rem;">${p.name}</span>
-                    </div>
-                    <div class="flex-row align-center gap-sm">
-                        ${status}
-                        <button class="icon-btn text-danger ml-sm" onclick="deletePerson('${p.id}')" title="Remove Person"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-                    </div>
-                </div>
-                ${splitsHtml ? `<div class="mt-md">${splitsHtml}</div>` : ''}
-            </div>`;
-    }).join('');
-
+    list.innerHTML = html;
     document.getElementById('settlements-total').innerText = formatCurrency(totalOwed);
-    document.getElementById('settlements-count').innerText = `${state.people.length} people`;
+    document.getElementById('settlements-count').innerText = `${peopleCount} people`;
 }
 
 function renderAnalytics(stats) {
@@ -553,7 +619,7 @@ function renderAnalytics(stats) {
     let catTotals = {};
     
     state.expenses.forEach(tx => {
-        if (tx.date.startsWith(currMonth)) {
+        if (!tx.isSettlement && tx.date.startsWith(currMonth)) {
             let myShare = tx.amount;
             if(tx.splits) tx.splits.forEach(s => myShare -= s.amount);
             if(myShare > 0) {
@@ -597,18 +663,21 @@ function renderAnalytics(stats) {
 }
 
 function renderManageCategories() {
-    populateCategoriesDropdown();
     const list = document.getElementById('category-manage-list');
     list.innerHTML = state.categories.map(c => `
-        <div class="list-item">
+        <div class="flex-between align-center card m-0 p-sm border-0 shadow-sm">
             <div class="flex-row align-center gap-sm">
                 <span class="legend-dot" style="background:${c.color}"></span>
-                <span class="font-medium">${c.name}</span>
+                <span>${c.name}</span>
             </div>
             <button class="icon-btn text-danger" onclick="deleteCategory('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         </div>
     `).join('');
 }
+
+// Ensure category management modal populates on open
+document.querySelector('[onclick="openModal('modal-category-manage')"]').addEventListener('click', renderManageCategories);
+
 
 // --- DATA ---
 function exportData() {
