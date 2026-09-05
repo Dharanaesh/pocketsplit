@@ -38,6 +38,9 @@ function init() {
     document.getElementById('exp-date').value = today;
     document.getElementById('expense-month').value = today.substring(0, 7);
 
+    // Global category populate so the dropdown is never empty
+    populateCategoriesDropdown();
+
     if (state.isAuthenticated) {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('app-shell').style.display = '';
@@ -116,7 +119,7 @@ function openModal(id) {
 }
 
 function closeAllModals() {
-    // Bulletproof close failsafe - hides all modals
+    // Bulletproof close failsafe - hides all modals immediately
     document.querySelectorAll('.modal').forEach(m => {
         m.classList.remove('show');
         setTimeout(() => m.style.display = 'none', 300);
@@ -131,7 +134,7 @@ function closeAllModals() {
 
 // --- CALCULATION ENGINE ---
 function getBalances() {
-    let balances = {}; // { personId: amount_owed_to_me }
+    let balances = {}; 
     state.people.forEach(p => balances[p.id] = 0);
     
     let monthTotalPaid = 0;
@@ -142,7 +145,6 @@ function getBalances() {
         const isCurrMonth = tx.date.startsWith(currMonth);
         
         if (tx.isSettlement) {
-            // Friend pays me
             if(balances[tx.personId] !== undefined) balances[tx.personId] -= tx.amount;
         } else {
             let myShare = tx.amount;
@@ -237,14 +239,22 @@ function updateSplitTotal() {
     label.className = allocated > total ? 'text-danger font-bold' : 'text-primary font-bold';
 }
 
+function populateCategoriesDropdown() {
+    const el = document.getElementById('exp-category');
+    if (el) {
+        const currentVal = el.value;
+        el.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        if (currentVal) el.value = currentVal;
+    }
+}
+
 function openExpenseModal(id = null) {
     const form = document.getElementById('form-expense');
     form.reset();
     document.getElementById('exp-id').value = id || '';
     document.getElementById('modal-expense-title').innerText = id ? 'Edit Expense' : 'Add Expense';
     
-    // Categories
-    document.getElementById('exp-category').innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    populateCategoriesDropdown();
     document.getElementById('split-section').style.display = 'none';
 
     if (id) {
@@ -574,6 +584,7 @@ function renderAnalytics(stats) {
 }
 
 function renderManageCategories() {
+    populateCategoriesDropdown(); // Ensure global dropdown is synced
     const list = document.getElementById('category-manage-list');
     list.innerHTML = state.categories.map(c => `
         <div class="list-item">
