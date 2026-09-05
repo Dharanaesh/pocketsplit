@@ -90,7 +90,14 @@ function switchTab(tabId) {
     document.getElementById(`view-${tabId}`).classList.add('active');
     document.querySelectorAll(`.nav-item[data-target="${tabId}"]`).forEach(n => n.classList.add('active'));
     
-    const titles = { 'home': 'Home', 'expenses': 'Expenses', 'settlements': 'Settlements', 'analytics': 'Analytics', 'settings': 'Settings' };
+    const titles = { 
+        'home': 'Home', 
+        'expenses': 'Expenses', 
+        'settlements': 'Settlements', 
+        'analytics': 'Analytics', 
+        'settings': 'Settings',
+        'categories': 'Categories'
+    };
     document.getElementById('header-title').innerText = titles[tabId];
 }
 
@@ -370,14 +377,12 @@ function addCategory(e) {
     });
     document.getElementById('new-cat-name').value = '';
     saveData();
-    renderManageCategories();
 }
 
 function deleteCategory(id) {
     if(confirm("Delete category?")) {
         state.categories = state.categories.filter(c => c.id !== id);
         saveData();
-        renderManageCategories();
     }
 }
 
@@ -403,6 +408,7 @@ function renderAll() {
     renderExpenses();
     renderSettlements(stats.balances);
     renderAnalytics(stats);
+    renderManageCategories(); // Renders the category list in the new tab
 }
 
 function renderHome(stats) {
@@ -462,7 +468,7 @@ function buildExpenseRow(tx, showEdit = false) {
     }
 
     const cat = state.categories.find(c => c.id === tx.categoryId) || {name: 'Other', color: '#888', icon: '<circle cx="12" cy="12" r="10"></circle>'};
-    const splitBadge = (tx.splits && tx.splits.length > 0) ? `<span class="item-status">Split</span>` : '';
+    const splitBadge = (tx.splits && tx.splits.length > 0) ? `<span class="item-status text-primary font-medium" style="background:var(--primary-light); padding: 2px 6px; border-radius:4px; font-size:11px;">Split</span>` : '';
 
     return `
         <div class="list-item card m-0 border-0 shadow-sm ${showEdit ? 'clickable' : ''}" ${showEdit ? `onclick="openExpenseModal('${tx.id}')"` : ''}>
@@ -569,10 +575,10 @@ function renderAnalytics(stats) {
 function renderManageCategories() {
     const list = document.getElementById('category-manage-list');
     list.innerHTML = state.categories.map(c => `
-        <div class="flex-between align-center card m-0 p-sm border-0 shadow-sm">
+        <div class="list-item">
             <div class="flex-row align-center gap-sm">
                 <span class="legend-dot" style="background:${c.color}"></span>
-                <span>${c.name}</span>
+                <span class="font-medium">${c.name}</span>
             </div>
             <button class="icon-btn text-danger" onclick="deleteCategory('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
         </div>

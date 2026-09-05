@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -48,6 +48,9 @@
                 </button>
                 <button class="nav-item" onclick="switchTab('analytics')" data-target="analytics">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Analytics
+                </button>
+                <button class="nav-item" onclick="switchTab('categories')" data-target="categories">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"></path></svg> Categories
                 </button>
                 
                 <div class="sidebar-divider"></div>
@@ -156,12 +159,41 @@
                 </div>
             </section>
 
-            <!-- 5. SETTINGS VIEW -->
+            <!-- 5. CATEGORIES VIEW -->
+            <section id="view-categories" class="view pb-xl">
+                <div class="flex-between align-center mb-md">
+                    <h1 class="page-title">Categories</h1>
+                    <button class="btn btn-secondary btn-sm mobile-only" onclick="switchTab('settings')">Back</button>
+                </div>
+
+                <div class="card mb-lg">
+                    <form onsubmit="addCategory(event)">
+                        <div class="flex-row gap-sm align-end">
+                            <div class="form-group flex-1 mb-0">
+                                <label>New Category</label>
+                                <input type="text" id="new-cat-name" class="input-standard" placeholder="e.g. Subscriptions" required>
+                            </div>
+                            <div class="form-group mb-0" style="width: 50px;">
+                                <label>Color</label>
+                                <input type="color" id="new-cat-color" class="color-picker w-100" value="#5B5FEF" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 mt-md">Add Category</button>
+                    </form>
+                </div>
+                
+                <h3 class="section-title mb-sm">Existing Categories</h3>
+                <div class="card p-0 overflow-hidden" id="category-manage-list">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- 6. SETTINGS VIEW -->
             <section id="view-settings" class="view pb-xl">
                 <h1 class="page-title mb-md">Settings</h1>
                 
                 <div class="card p-0 mb-md overflow-hidden">
-                    <div class="list-item clickable" onclick="openModal('modal-category-manage')">
+                    <div class="list-item clickable mobile-only" onclick="switchTab('categories')">
                         <span>Manage Categories</span>
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </div>
@@ -190,7 +222,7 @@
                     </div>
                 </div>
                 
-                <p class="text-center text-muted text-sm">PocketSplit v1.0.0</p>
+                <p class="text-center text-muted text-sm">PocketSplit v1.0.1</p>
             </section>
         </main>
 
@@ -227,8 +259,8 @@
     <!-- MODALS & OVERLAYS -->
     <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
 
-    <!-- Add Expense Modal (Bottom Sheet on Mobile, Centered on Desktop) -->
-    <div class="modal" id="modal-expense">
+    <!-- Add Expense Modal -->
+    <div class="modal bottom-sheet" id="modal-expense">
         <div class="modal-header">
             <h3 id="modal-expense-title">Add Expense</h3>
             <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
@@ -331,22 +363,6 @@
                 </div>
                 <button type="submit" class="btn btn-primary w-100 mt-md">Mark as Settled</button>
             </form>
-        </div>
-    </div>
-
-    <!-- Category Management Modal -->
-    <div class="modal bottom-sheet" id="modal-category-manage">
-        <div class="modal-header">
-            <h3>Categories</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        </div>
-        <div class="modal-body">
-            <form onsubmit="addCategory(event)" class="flex-row gap-sm mb-lg">
-                <input type="text" id="new-cat-name" class="input-standard flex-1" placeholder="New Category" required>
-                <input type="color" id="new-cat-color" class="color-picker" value="#5B5FEF">
-                <button type="submit" class="btn btn-primary">Add</button>
-            </form>
-            <div id="category-manage-list" class="flex-col gap-sm"></div>
         </div>
     </div>
 
