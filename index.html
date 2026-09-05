@@ -14,7 +14,7 @@
     <div id="login-screen" class="active">
         <div class="login-container">
             <div class="login-logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
             </div>
             <h1>PocketSplit</h1>
             <p class="text-secondary mb-xl">Your personal expense companion</p>
@@ -33,7 +33,7 @@
         <!-- Desktop Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
                 <h2>PocketSplit</h2>
             </div>
             <nav class="sidebar-nav">
@@ -73,29 +73,29 @@
                 <div class="desktop-header desktop-only flex-between align-center mb-xl">
                     <div>
                         <p class="text-secondary">Good morning 👋</p>
-                        <h1 class="page-title">Here's your spending overview.</h1>
+                        <h1 class="page-title" style="font-size: 2rem;">Here's your spending overview.</h1>
                     </div>
                     <div class="flex-row gap-sm">
-                        <button class="btn btn-secondary" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
+                        <button class="btn btn-secondary" onclick="toggleTheme()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
                         <button class="btn btn-primary" onclick="openExpenseModal()">+ Add Expense</button>
                     </div>
                 </div>
 
                 <div class="grid-2 gap-md mb-lg">
                     <div class="card summary-card">
-                        <span class="text-secondary text-sm">My Spending</span>
+                        <span class="text-secondary text-sm font-medium">My Spending</span>
                         <h2 id="home-my-spend" class="mt-xs">₹0</h2>
                     </div>
                     <div class="card summary-card">
-                        <span class="text-secondary text-sm">Total Paid</span>
+                        <span class="text-secondary text-sm font-medium">Total Paid</span>
                         <h2 id="home-total-paid" class="mt-xs">₹0</h2>
                     </div>
                     <div class="card summary-card">
-                        <span class="text-secondary text-sm">To Receive</span>
+                        <span class="text-secondary text-sm font-medium">To Receive</span>
                         <h2 id="home-to-receive" class="mt-xs text-success">₹0</h2>
                     </div>
                     <div class="card summary-card">
-                        <span class="text-secondary text-sm">Budget Left</span>
+                        <span class="text-secondary text-sm font-medium">Budget Left</span>
                         <h2 id="home-budget-left" class="mt-xs text-primary">₹0</h2>
                     </div>
                 </div>
@@ -107,7 +107,7 @@
 
                 <div class="flex-between align-center mb-md">
                     <h3 class="section-title">Recent Expenses</h3>
-                    <button class="btn-ghost text-primary text-sm font-medium" onclick="switchTab('expenses')">View All</button>
+                    <button class="btn-ghost text-primary text-sm font-medium p-0" onclick="switchTab('expenses')">View All</button>
                 </div>
                 <div id="recent-expenses-list" class="flex-col gap-sm pb-xl"></div>
             </section>
@@ -133,8 +133,8 @@
                 </div>
                 
                 <div class="card mb-lg text-center p-lg">
-                    <span class="text-secondary text-sm">You should receive</span>
-                    <h2 id="settlements-total" class="text-success mt-xs mb-xs">₹0</h2>
+                    <span class="text-secondary text-sm font-medium">You should receive</span>
+                    <h2 id="settlements-total" class="text-success mt-xs mb-xs" style="font-size: 2.2rem;">₹0</h2>
                     <span id="settlements-count" class="text-muted text-sm">0 people</span>
                 </div>
 
@@ -145,12 +145,12 @@
             <section id="view-analytics" class="view">
                 <h1 class="page-title mb-md">Analytics</h1>
                 
-                <div class="card mb-md text-center">
-                    <span class="text-secondary text-sm">Total Spending (This Month)</span>
-                    <h2 id="analytics-total" class="mt-xs">₹0</h2>
+                <div class="card mb-md text-center p-lg">
+                    <span class="text-secondary text-sm font-medium">Total Spending (This Month)</span>
+                    <h2 id="analytics-total" class="mt-xs" style="font-size: 2.2rem;">₹0</h2>
                 </div>
 
-                <div class="card mb-md">
+                <div class="card mb-md p-lg">
                     <h3 class="section-title mb-lg">Spending by Category</h3>
                     <div class="flex-col align-center">
                         <div id="pie-chart" class="pie-chart mb-lg"></div>
@@ -166,14 +166,14 @@
                     <button class="btn btn-secondary btn-sm mobile-only" onclick="switchTab('settings')">Back</button>
                 </div>
 
-                <div class="card mb-lg">
+                <div class="card mb-lg p-lg">
                     <form onsubmit="addCategory(event)">
                         <div class="flex-row gap-sm align-end">
                             <div class="form-group flex-1 mb-0">
                                 <label>New Category</label>
                                 <input type="text" id="new-cat-name" class="input-standard" placeholder="e.g. Subscriptions" required>
                             </div>
-                            <div class="form-group mb-0" style="width: 50px;">
+                            <div class="form-group mb-0" style="width: 60px;">
                                 <label>Color</label>
                                 <input type="color" id="new-cat-color" class="color-picker w-100" value="#5B5FEF" required>
                             </div>
@@ -194,35 +194,37 @@
                 
                 <div class="card p-0 mb-md overflow-hidden">
                     <div class="list-item clickable mobile-only" onclick="switchTab('categories')">
-                        <span>Manage Categories</span>
+                        <span class="font-medium">Manage Categories</span>
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </div>
                     <div class="list-item clickable" onclick="openModal('modal-budget')">
-                        <span>Manage Budget</span>
+                        <span class="font-medium">Manage Budget</span>
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </div>
                 </div>
 
                 <div class="card p-0 mb-md overflow-hidden">
                     <div class="list-item clickable" onclick="exportData()">
-                        <span>Export Backup (.json)</span>
+                        <span class="font-medium">Export Backup (.json)</span>
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
                     </div>
                     <label class="list-item clickable m-0 border-0">
-                        <span>Import Backup</span>
+                        <span class="font-medium">Import Backup</span>
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
                         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
                     </label>
                 </div>
 
                 <div class="card p-0 mb-xl overflow-hidden border-danger">
                     <div class="list-item clickable text-danger" onclick="clearAllData()">
-                        <span>Clear All Data</span>
+                        <span class="font-medium">Clear All Data</span>
                     </div>
                     <div class="list-item clickable text-danger border-0" onclick="logout()">
-                        <span>Lock App</span>
+                        <span class="font-medium">Lock App</span>
                     </div>
                 </div>
                 
-                <p class="text-center text-muted text-sm">PocketSplit v1.0.1</p>
+                <p class="text-center text-muted text-sm">PocketSplit v1.0.2</p>
             </section>
         </main>
 
@@ -263,7 +265,7 @@
     <div class="modal bottom-sheet" id="modal-expense">
         <div class="modal-header">
             <h3 id="modal-expense-title">Add Expense</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button type="button" class="btn-ghost icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
             <form onsubmit="saveExpense(event)">
@@ -294,9 +296,9 @@
                 </div>
 
                 <div class="form-group mt-md">
-                    <label class="flex-row align-center gap-sm cursor-pointer mb-sm">
+                    <label class="flex-row align-center gap-sm cursor-pointer mb-sm" style="user-select: none;">
                         <input type="checkbox" id="exp-is-split" class="checkbox-custom" onchange="toggleSplitUI()">
-                        <span class="font-medium">Split with friends?</span>
+                        <span class="font-medium" style="font-size: 1rem;">Split with friends?</span>
                     </label>
                 </div>
 
@@ -313,8 +315,8 @@
                     <div id="split-members-list" class="flex-col gap-sm"></div>
                     
                     <div class="split-summary mt-md pt-md border-top flex-between">
-                        <span class="text-sm text-secondary" id="split-validation-text">Calculated Total:</span>
-                        <strong class="text-primary" id="split-total-amount">₹0</strong>
+                        <span class="text-sm text-secondary font-medium" id="split-validation-text">Calculated Total:</span>
+                        <strong class="text-primary" id="split-total-amount" style="font-size: 1.1rem;">₹0</strong>
                     </div>
                 </div>
 
@@ -330,7 +332,7 @@
     <div class="modal center-modal" id="modal-person">
         <div class="modal-header">
             <h3>Add Person</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button type="button" class="btn-ghost icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
             <form onsubmit="savePerson(event)">
@@ -348,14 +350,14 @@
     <div class="modal center-modal" id="modal-settle">
         <div class="modal-header">
             <h3>Record Settlement</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button type="button" class="btn-ghost icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
             <form onsubmit="saveSettlement(event)">
                 <input type="hidden" id="settle-friend-id">
                 <div class="text-center mb-lg">
                     <p class="text-secondary text-sm mb-xs">Outstanding Balance</p>
-                    <h2 id="settle-outstanding" class="text-primary">₹0</h2>
+                    <h2 id="settle-outstanding" class="text-primary" style="font-size: 2rem;">₹0</h2>
                 </div>
                 <div class="form-group">
                     <label>Amount Received (₹)</label>
@@ -370,7 +372,7 @@
     <div class="modal center-modal" id="modal-budget">
         <div class="modal-header">
             <h3>Monthly Budget</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button type="button" class="btn-ghost icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
             <form onsubmit="saveBudget(event)">

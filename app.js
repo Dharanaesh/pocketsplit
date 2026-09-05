@@ -67,7 +67,7 @@ function logout() {
 
 function saveData() {
     localStorage.setItem('pocketsplit_data', JSON.stringify(state));
-    renderAll(); // Auto update UI on state change
+    renderAll();
 }
 
 // --- THEMING ---
@@ -103,6 +103,7 @@ function switchTab(tabId) {
 
 // --- MODALS ---
 let activeModal = null;
+
 function openModal(id) {
     document.getElementById('overlay').style.display = 'block';
     const modal = document.getElementById(id);
@@ -115,15 +116,17 @@ function openModal(id) {
 }
 
 function closeAllModals() {
-    if (!activeModal) return;
-    const modal = document.getElementById(activeModal);
-    modal.classList.remove('show');
-    document.getElementById('overlay').style.opacity = '0';
-    setTimeout(() => {
-        modal.style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
-        activeModal = null;
-    }, 300);
+    // Bulletproof close failsafe - hides all modals
+    document.querySelectorAll('.modal').forEach(m => {
+        m.classList.remove('show');
+        setTimeout(() => m.style.display = 'none', 300);
+    });
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 300);
+    }
+    activeModal = null;
 }
 
 // --- CALCULATION ENGINE ---
@@ -142,7 +145,6 @@ function getBalances() {
             // Friend pays me
             if(balances[tx.personId] !== undefined) balances[tx.personId] -= tx.amount;
         } else {
-            // Normal expense. Assume "I" paid for everything upfront in this MVP for simplicity
             let myShare = tx.amount;
             
             if (tx.splits && tx.splits.length > 0) {
@@ -194,7 +196,7 @@ function renderSplitMembers() {
     list.innerHTML = state.people.map(p => `
         <div class="split-row">
             <input type="checkbox" class="split-cb checkbox-custom" value="${p.id}" checked onchange="calculateSplits()">
-            <span class="flex-1">${p.name}</span>
+            <span class="flex-1 font-medium">${p.name}</span>
             <input type="number" class="split-val input-standard p-0 text-right border-0" data-id="${p.id}" placeholder="0" oninput="handleManualSplit()">
         </div>
     `).join('');
@@ -213,7 +215,6 @@ function calculateSplits() {
     if (checked.length === 0) { updateSplitTotal(); return; }
 
     if (splitType === 'equal') {
-        // Equal split implies splitting among checked friends + ME
         const amt = (total / (checked.length + 1)).toFixed(2);
         checked.forEach(r => r.querySelector('.split-val').value = amt);
     }
@@ -408,7 +409,7 @@ function renderAll() {
     renderExpenses();
     renderSettlements(stats.balances);
     renderAnalytics(stats);
-    renderManageCategories(); // Renders the category list in the new tab
+    renderManageCategories();
 }
 
 function renderHome(stats) {
@@ -454,9 +455,9 @@ function buildExpenseRow(tx, showEdit = false) {
         return `
             <div class="list-item card m-0 border-0 shadow-sm">
                 <div class="flex-row align-center gap-sm">
-                    <div class="icon-container bg-success-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+                    <div class="icon-container bg-success-light text-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
                     <div>
-                        <div class="font-medium">Settlement from ${p.name}</div>
+                        <div class="font-medium text-primary">Settlement from ${p.name}</div>
                         <div class="text-sm text-secondary">${tx.date}</div>
                     </div>
                 </div>
@@ -498,7 +499,7 @@ function renderSettlements(balances) {
         const bal = balances[p.id] || 0;
         if(bal > 0) totalOwed += bal;
         
-        let status = bal === 0 ? '<span class="text-secondary">Settled</span>' : 
+        let status = bal === 0 ? '<span class="text-secondary font-medium">Settled</span>' : 
                     (bal > 0 ? `<span class="text-success font-medium">Owes you ${formatCurrency(bal)}</span>` : 
                                `<span class="text-danger font-medium">You owe ${formatCurrency(Math.abs(bal))}</span>`);
 
@@ -506,8 +507,8 @@ function renderSettlements(balances) {
             <div class="card p-md shadow-sm">
                 <div class="flex-between align-center mb-sm">
                     <div class="flex-row align-center gap-sm">
-                        <div class="icon-container bg-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
-                        <span class="font-bold">${p.name}</span>
+                        <div class="icon-container bg-light text-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
+                        <span class="font-bold" style="font-size:1.1rem;">${p.name}</span>
                     </div>
                     ${status}
                 </div>
