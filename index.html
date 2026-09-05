@@ -2,218 +2,355 @@
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TrackIt Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PocketSplit</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <meta name="theme-color" content="#ffffff" id="meta-theme-color">
+    <!-- Preload fonts if possible, using system fonts for optimal performance and native feel -->
 </head>
 <body>
-    <header>
-        <h1 id="header-title">Dashboard</h1>
-    </header>
-
-    <main id="app-content">
-        <!-- DASHBOARD VIEW -->
-        <section id="view-dashboard" class="view active">
-            <div class="card balance-card">
-                <div class="balance-header">
-                    <span>My Actual Spend</span>
-                    <span class="month-label" id="dash-month-label">This Month</span>
-                </div>
-                <h2 id="dash-my-spend">₹0</h2>
-                <div class="budget-progress">
-                    <div class="progress-bar"><div class="progress-fill" id="budget-fill"></div></div>
-                    <div class="budget-text">
-                        <span id="budget-status">No budget set</span>
-                    </div>
-                </div>
-                <div class="stats-row">
-                    <div class="stat-box">
-                        <span class="stat-label">Total Paid</span>
-                        <span class="stat-val text-muted" id="dash-total-paid">₹0</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-label">Friends Owe Me</span>
-                        <span class="stat-val text-green" id="dash-total-owed">₹0</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>Analytics</h3>
-                <div class="analytics-container">
-                    <div class="pie-chart" id="category-pie"></div>
-                    <div class="legend" id="category-legend"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- EXPENSES VIEW -->
-        <section id="view-expenses" class="view">
-            <div class="filter-row">
-                <input type="month" id="expense-month-filter" onchange="renderExpenses()">
-            </div>
-            <div id="expense-list" class="list-container"></div>
-            <button class="fab" onclick="openExpenseModal()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    <div id="app-container">
+        <!-- Header -->
+        <header id="main-header">
+            <h1 id="header-title">Home</h1>
+            <button id="theme-toggle" class="icon-btn" onclick="toggleTheme()" aria-label="Toggle Theme">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
-        </section>
+        </header>
 
-        <!-- MANAGE VIEW (Splits & Categories) -->
-        <section id="view-manage" class="view">
-            <div class="tabs-sub">
-                <button class="sub-tab active" onclick="switchManageTab('friends', this)">Friends & Splits</button>
-                <button class="sub-tab" onclick="switchManageTab('categories', this)">Categories</button>
-            </div>
+        <!-- MAIN CONTENT AREA -->
+        <main id="main-content">
             
-            <div id="manage-friends" class="sub-view active">
-                <div class="flex-between mb-3">
-                    <h3>Who Owes You?</h3>
-                    <button class="btn-outline-small" onclick="openModal('modal-add-friend')">+ Add Friend</button>
+            <!-- HOME VIEW -->
+            <section id="view-home" class="view active">
+                <div class="card summary-card">
+                    <p class="summary-label">This Month's Spend</p>
+                    <h2 class="summary-total" id="home-total-spend">₹0</h2>
+                    <div class="summary-details">
+                        <div class="summary-item">
+                            <span class="label">Budget Left</span>
+                            <span class="value text-primary" id="home-budget-left">₹0</span>
+                        </div>
+                        <div class="summary-divider"></div>
+                        <div class="summary-item">
+                            <span class="label">Owed to me</span>
+                            <span class="value text-success" id="home-owed-to-me">₹0</span>
+                        </div>
+                    </div>
                 </div>
-                <div id="splits-list" class="list-container"></div>
-            </div>
 
-            <div id="manage-categories" class="sub-view" style="display:none;">
-                <div class="flex-between mb-3">
-                    <h3>My Categories</h3>
-                    <button class="btn-outline-small" onclick="openModal('modal-add-category')">+ Add Category</button>
+                <!-- Pending GPay Reminders -->
+                <div id="gpay-reminders-section" style="display: none;">
+                    <div class="section-header">
+                        <h3>Split Reminders</h3>
+                    </div>
+                    <div id="gpay-reminders-list" class="flex-col gap-sm"></div>
                 </div>
-                <div id="categories-list" class="list-container"></div>
-            </div>
-        </section>
 
-        <!-- SETTINGS VIEW -->
-        <section id="view-settings" class="view">
-            <div class="card">
-                <h3>Preferences</h3>
-                <div class="setting-item">
-                    <span>Theme</span>
-                    <select id="theme-select" onchange="changeTheme(this.value)">
-                        <option value="light">Light Mode</option>
-                        <option value="dark">Dark Mode</option>
-                    </select>
+                <div class="section-header mt-lg">
+                    <h3>Recent Expenses</h3>
+                    <button class="text-btn" onclick="switchTab('expenses')">See All</button>
                 </div>
-                <div class="setting-item">
-                    <span>Monthly Budget (₹)</span>
-                    <input type="number" id="setting-budget" placeholder="e.g. 10000" onchange="saveBudget(this.value)">
+                <div id="home-recent-expenses" class="flex-col gap-sm">
+                    <!-- Populated by JS -->
                 </div>
-            </div>
-            <div class="card">
-                <h3>Data Sync</h3>
-                <button class="btn secondary w-100 mb-2" onclick="exportData()">Export Backup (.json)</button>
-                <label class="btn secondary w-100 text-center" style="display:block;">
-                    Import Backup
-                    <input type="file" accept=".json" style="display:none;" onchange="importData(event)">
-                </label>
-            </div>
-        </section>
-    </main>
+            </section>
 
-    <!-- Bottom Nav -->
-    <nav class="bottom-nav">
-        <button class="nav-item active" onclick="switchTab('dashboard', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-            <span>Dash</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('expenses', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-            <span>Expenses</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('manage', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            <span>Manage</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('settings', this)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            <span>Settings</span>
-        </button>
-    </nav>
+            <!-- EXPENSES VIEW -->
+            <section id="view-expenses" class="view">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="expense-search" placeholder="Search expenses..." oninput="renderExpenses()">
+                    </div>
+                    <input type="month" id="expense-month-filter" class="date-filter" onchange="renderExpenses()">
+                </div>
+                <div id="expense-list-container" class="flex-col gap-md mt-md">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
 
-    <!-- MODALS -->
-    <div id="modal-add-expense" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="expense-modal-title">Add Expense</h2>
-                <button class="close-btn" onclick="closeModal('modal-add-expense')">&times;</button>
-            </div>
-            <form id="form-expense" onsubmit="handleExpenseSubmit(event)">
+            <!-- SETTLEMENTS VIEW -->
+            <section id="view-settlements" class="view">
+                <div class="flex-between align-center mb-md">
+                    <h2 class="page-title">People</h2>
+                    <button class="btn-secondary btn-sm" onclick="openModal('modal-person')">+ Add Person</button>
+                </div>
+                
+                <div class="net-balance-banner card mb-md" id="settlements-net-banner">
+                    <span class="text-sm text-secondary">Net Balance</span>
+                    <h3 id="settlements-net-amount">₹0</h3>
+                </div>
+
+                <div id="people-list-container" class="flex-col gap-sm">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- BUDGET VIEW -->
+            <section id="view-budget" class="view">
+                <div class="flex-between align-center mb-md">
+                    <h2 class="page-title">Monthly Budget</h2>
+                    <button class="btn-secondary btn-sm" onclick="openModal('modal-budget')">Set Budget</button>
+                </div>
+
+                <div class="card mb-md" id="budget-overview-card">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="section-header mt-lg">
+                    <h3>Analytics</h3>
+                </div>
+                <div class="card flex-col align-center">
+                    <div class="pie-chart-container mb-md">
+                        <div id="analytics-pie" class="pie-chart"></div>
+                    </div>
+                    <div id="analytics-legend" class="w-100 flex-col gap-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- MORE / MANAGE VIEW -->
+            <section id="view-more" class="view">
+                <h2 class="page-title mb-md">Settings & Management</h2>
+                
+                <div class="list-group mb-md">
+                    <div class="list-group-item" onclick="openModal('modal-categories')">
+                        <div class="flex-row align-center gap-sm">
+                            <div class="icon-box bg-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"></path></svg></div>
+                            <span>Manage Categories</span>
+                        </div>
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-tertiary)" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </div>
+                    <div class="list-group-item" onclick="exportData()">
+                        <div class="flex-row align-center gap-sm">
+                            <div class="icon-box bg-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg></div>
+                            <span>Export Backup (.json)</span>
+                        </div>
+                    </div>
+                    <label class="list-group-item cursor-pointer">
+                        <div class="flex-row align-center gap-sm">
+                            <div class="icon-box bg-light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg></div>
+                            <span>Import Backup</span>
+                            <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+                        </div>
+                    </label>
+                    <div class="list-group-item text-danger" onclick="clearData()">
+                        <div class="flex-row align-center gap-sm">
+                            <div class="icon-box bg-danger-light text-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
+                            <span>Reset All Data</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Floating Action Button -->
+        <button class="fab" onclick="openExpenseModal()" aria-label="Add Expense">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+
+        <!-- Bottom Navigation -->
+        <nav id="bottom-nav">
+            <button class="nav-item active" onclick="switchTab('home')" data-target="home">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('expenses')" data-target="expenses">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>Expenses</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('settlements')" data-target="settlements">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>Settlements</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('budget')" data-target="budget">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                <span>Budget</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('more')" data-target="more">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                <span>More</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODALS (Hidden by default) -->
+    <div class="modal-backdrop" id="modal-backdrop" onclick="closeAllModals()"></div>
+
+    <!-- 1. Add/Edit Expense Modal -->
+    <div class="modal bottom-sheet" id="modal-expense">
+        <div class="modal-header">
+            <h3 id="modal-expense-title">Add Expense</h3>
+            <button class="icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <form id="form-expense" onsubmit="saveExpense(event)">
                 <input type="hidden" id="exp-id">
                 
-                <div class="form-group">
-                    <label>Total Amount Paid (₹)</label>
-                    <input type="number" id="exp-amount" required min="1">
+                <div class="input-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="exp-amount" class="input-lg text-center" placeholder="0.00" step="0.01" required oninput="calculateSplits()">
                 </div>
-                <div class="form-group">
+                
+                <div class="input-group">
                     <label>Description</label>
-                    <input type="text" id="exp-desc" placeholder="e.g. Dinner" required>
+                    <input type="text" id="exp-desc" placeholder="What was this for?" required>
                 </div>
-                <div class="flex-row">
-                    <div class="form-group w-50">
-                        <label>Date</label>
-                        <input type="date" id="exp-date" required>
-                    </div>
-                    <div class="form-group w-50">
+                
+                <div class="flex-row gap-sm mb-md">
+                    <div class="input-group w-50 mb-0">
                         <label>Category</label>
                         <select id="exp-category" required></select>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="exp-is-split" onchange="renderSplitFriendsList()">
-                        <strong>Split this with friends?</strong>
-                    </label>
-                </div>
-                
-                <div id="split-friends-container" style="display:none;" class="split-box">
-                    <p class="text-muted mb-2 text-sm">Select who owes you and how much.</p>
-                    <div id="split-friends-list"></div>
-                    <div class="mt-2 text-sm text-primary">
-                        Your actual spend will be: <strong id="calculated-my-spend">₹0</strong>
+                    <div class="input-group w-50 mb-0">
+                        <label>Date</label>
+                        <input type="date" id="exp-date" required>
                     </div>
                 </div>
 
-                <button type="submit" class="btn primary w-100 mt-3">Save Expense</button>
+                <div class="input-group">
+                    <label>Paid By</label>
+                    <select id="exp-paid-by" required>
+                        <option value="me">Me</option>
+                        <!-- Friends injected here -->
+                    </select>
+                </div>
+
+                <div class="card bg-light mb-md p-md">
+                    <label class="flex-row align-center gap-sm cursor-pointer mb-sm">
+                        <input type="checkbox" id="exp-is-split" onchange="toggleSplitUI()">
+                        <span class="font-medium">Split with friends</span>
+                    </label>
+                    
+                    <div id="split-ui" style="display: none;">
+                        <div class="input-group mt-sm">
+                            <label>Split Method</label>
+                            <div class="segmented-control">
+                                <button type="button" class="seg-btn active" data-type="equal" onclick="setSplitType('equal')">Equal</button>
+                                <button type="button" class="seg-btn" data-type="percent" onclick="setSplitType('percent')">%</button>
+                                <button type="button" class="seg-btn" data-type="custom" onclick="setSplitType('custom')">Custom</button>
+                            </div>
+                        </div>
+                        
+                        <div id="split-members-list" class="flex-col gap-xs mt-sm">
+                            <!-- Populated dynamically based on friends -->
+                        </div>
+                        <div class="text-sm text-secondary mt-sm flex-between">
+                            <span>Total Allocated:</span>
+                            <strong id="split-total-check" class="text-primary">₹0.00</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 btn-lg">Save Expense</button>
             </form>
         </div>
     </div>
 
-    <!-- Add Friend Modal -->
-    <div id="modal-add-friend" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add Friend</h2>
-                <button class="close-btn" onclick="closeModal('modal-add-friend')">&times;</button>
+    <!-- 2. GPay Reminder Modal (Triggers after saving a split where user paid) -->
+    <div class="modal center-modal" id="modal-gpay">
+        <div class="modal-body text-center p-lg">
+            <div class="icon-box-lg bg-primary-light text-primary mx-auto mb-md">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             </div>
-            <form onsubmit="handleAddFriend(event)">
-                <div class="form-group">
-                    <label>Friend's Name</label>
-                    <input type="text" id="friend-name" required>
+            <h3 class="mb-sm">Split this on GPay?</h3>
+            <p class="text-secondary mb-lg">You paid <strong id="gpay-prompt-amount" class="text-main">₹0</strong> for this shared expense.</p>
+            
+            <div class="flex-col gap-sm">
+                <button class="btn btn-primary w-100" onclick="handleGPayAction('now')">Open GPay & Mark Done</button>
+                <button class="btn btn-secondary w-100" onclick="handleGPayAction('later')">Remind Me Later</button>
+                <button class="btn text-btn w-100" onclick="handleGPayAction('ignore')">Skip</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Add/Edit Person Modal -->
+    <div class="modal center-modal" id="modal-person">
+        <div class="modal-header border-0 pb-0">
+            <h3>Add Person</h3>
+            <button class="icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <form id="form-person" onsubmit="savePerson(event)">
+                <input type="hidden" id="person-id">
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="person-name" required placeholder="e.g. Arun">
                 </div>
-                <button type="submit" class="btn primary w-100">Save</button>
+                <button type="submit" class="btn btn-primary w-100">Save</button>
             </form>
         </div>
     </div>
 
-    <!-- Add Category Modal -->
-    <div id="modal-add-category" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add Category</h2>
-                <button class="close-btn" onclick="closeModal('modal-add-category')">&times;</button>
-            </div>
-            <form onsubmit="handleAddCategory(event)">
-                <div class="form-group">
-                    <label>Category Name</label>
-                    <input type="text" id="category-name" required>
+    <!-- 4. Manage Categories Modal -->
+    <div class="modal bottom-sheet" id="modal-categories">
+        <div class="modal-header">
+            <h3>Manage Categories</h3>
+            <button class="icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="saveCategory(event)" class="flex-row gap-sm mb-md align-end">
+                <div class="input-group mb-0 flex-1">
+                    <label>New Category</label>
+                    <input type="text" id="new-cat-name" required placeholder="Name">
                 </div>
-                <div class="form-group">
+                <div class="input-group mb-0" style="width: 60px;">
                     <label>Color</label>
-                    <input type="color" id="category-color" value="#007aff" required>
+                    <input type="color" id="new-cat-color" value="#0066FF" class="color-picker" required>
                 </div>
-                <button type="submit" class="btn primary w-100">Save</button>
+                <button type="submit" class="btn btn-primary" style="padding: 0 16px; height: 48px;">Add</button>
+            </form>
+            
+            <div id="manage-category-list" class="list-group">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Set Budget Modal -->
+    <div class="modal center-modal" id="modal-budget">
+        <div class="modal-header border-0 pb-0">
+            <h3>Set Monthly Budget</h3>
+            <button class="icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="saveBudget(event)">
+                <div class="input-group">
+                    <label>Total Budget (₹)</label>
+                    <input type="number" id="budget-amount" required placeholder="e.g. 30000" min="0">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Save Budget</button>
+                <button type="button" class="btn text-btn text-danger w-100 mt-sm" onclick="clearBudget()">Remove Budget</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 6. Record Settlement (Pay back) Modal -->
+    <div class="modal center-modal" id="modal-settle">
+        <div class="modal-header border-0 pb-0">
+            <h3>Record Payment</h3>
+            <button class="icon-btn" onclick="closeAllModals()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <form onsubmit="saveSettlement(event)">
+                <input type="hidden" id="settle-friend-id">
+                <p class="text-sm text-secondary mb-md" id="settle-desc">Recording a payment.</p>
+                <div class="input-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" id="settle-amount" required min="1" step="0.01">
+                </div>
+                <div class="input-group">
+                    <label>Direction</label>
+                    <select id="settle-direction" required>
+                        <option value="received">They paid me</option>
+                        <option value="paid">I paid them</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Save Record</button>
             </form>
         </div>
     </div>

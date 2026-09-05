@@ -1,14 +1,14 @@
 {
-  "name": "TrackIt Pro Expense Tracker",
-  "short_name": "TrackIt Pro",
-  "description": "Professional expense tracking and splits management.",
+  "name": "PocketSplit",
+  "short_name": "PocketSplit",
+  "description": "Modern expense splitting and tracking.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#007aff",
+  "background_color": "#ffffff",
+  "theme_color": "#0066FF",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23007aff'/><path d='M30 50 L45 65 L70 35' stroke='white' stroke-width='10' fill='none' stroke-linecap='round'/></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230066FF'/><path d='M30 50 L45 65 L70 35' stroke='white' stroke-width='10' fill='none' stroke-linecap='round'/></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml"
     }

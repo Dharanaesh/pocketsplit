@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trackit-pro-v1';
+const CACHE_NAME = 'pocketsplit-pwa-v2';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (e) => {
