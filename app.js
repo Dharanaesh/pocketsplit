@@ -1,6 +1,5 @@
 /**
- * PocketSplit - Fully Repaired Core Logic
- * Incorporates all UI bindings + Strict Security & Financial fixes.
+ * PocketSplit - Core Logic
  */
 
 // --- 1. STRICT IN-MEMORY AUTHENTICATION ---
@@ -15,18 +14,13 @@ let state = {
     budget: 0
 };
 
-// Split Engine State
 let currentSplitType = 'equal';
-let splitDataState = []; // Holds {personId, name, selected, share}
+let splitDataState = []; 
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
-    
-    // Set a default PIN for testing if none exists
-    if (!localStorage.getItem(PIN_KEY)) {
-        localStorage.setItem(PIN_KEY, '1234'); 
-    }
+    if (!localStorage.getItem(PIN_KEY)) localStorage.setItem(PIN_KEY, '1234'); 
 
     const savedCode = localStorage.getItem(PIN_KEY);
     if (savedCode && !window.POCKETSPLIT_AUTH.isUnlocked) {
@@ -82,6 +76,12 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
+            // Ensure expenses array is clean
+            state.expenses = state.expenses.map(e => ({
+                ...e,
+                amount: Number(e.amount),
+                splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null
+            }));
         }
     } catch (e) {
         console.error("Corrupted local storage. Starting fresh.");
@@ -137,7 +137,6 @@ window.openExpenseModal = function() {
     const catSelect = document.getElementById('exp-category');
     catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
-    // Reset Split UI
     document.getElementById('exp-is-split').checked = false;
     document.getElementById('split-section').style.display = 'none';
     currentSplitType = 'equal';
@@ -148,13 +147,12 @@ window.openExpenseModal = function() {
     openModal('modal-expense');
 };
 
-// --- SPLIT ENGINE (The Bug Fix) ---
+// --- SPLIT ENGINE ---
 window.toggleSplitUI = function() {
     const isChecked = document.getElementById('exp-is-split').checked;
     document.getElementById('split-section').style.display = isChecked ? 'block' : 'none';
     
     if (isChecked) {
-        // Initialize list
         splitDataState = [{personId: 'you', name: 'You', selected: true, share: 0}];
         state.people.forEach(p => {
             splitDataState.push({personId: p.id, name: p.name, selected: true, share: 0});
@@ -167,8 +165,6 @@ window.setSplitType = function(type) {
     currentSplitType = type;
     document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
     document.querySelector(`.seg-btn[data-type="${type}"]`).classList.add('active');
-    
-    // Reset shares when switching types
     splitDataState.forEach(s => s.share = 0);
     renderSplitMembers();
 };
@@ -207,7 +203,7 @@ window.renderSplitMembers = function() {
 window.togglePersonSplit = function(idx, isChecked) {
     splitDataState[idx].selected = isChecked;
     if (!isChecked) splitDataState[idx].share = 0;
-    renderSplitMembers(); // Re-render to handle disabled states properly
+    renderSplitMembers();
 };
 
 window.updatePersonShare = function(idx, val) {
@@ -229,10 +225,7 @@ window.calculateSplits = function() {
     if (currentSplitType === 'equal') {
         if (selected.length > 0) {
             const splitAmount = roundToTwo(totalExp / selected.length);
-            splitDataState.forEach(s => {
-                s.share = s.selected ? splitAmount : 0;
-            });
-            // Update inputs without losing focus
+            splitDataState.forEach(s => { s.share = s.selected ? splitAmount : 0; });
             document.querySelectorAll('.split-row input[type="number"]').forEach((input, idx) => {
                 if (splitDataState[idx].selected) input.value = splitAmount;
             });
@@ -240,7 +233,6 @@ window.calculateSplits = function() {
         }
         valText.innerText = "Calculated Total:";
         valTotal.innerText = formatINR(calculatedTotal);
-        // Allow a few pennies margin of error for division (e.g. 100/3)
         valTotal.className = Math.abs(totalExp - calculatedTotal) < 0.1 ? 'text-success' : 'text-danger';
         
     } else if (currentSplitType === 'percent') {
@@ -259,7 +251,6 @@ window.calculateSplits = function() {
 
 function validateSplitData(amount, type, data) {
     if (data.length === 0) throw new Error("Please select at least one person for the split.");
-    
     if (type === 'percent') {
         const total = roundToTwo(data.reduce((sum, d) => sum + d.share, 0));
         if (total !== 100) throw new Error(`Percentages must equal 100% (Currently ${total}%).`);
@@ -290,11 +281,15 @@ window.saveExpense = function(e) {
 
         if (isSplit) {
             splitType = currentSplitType;
-            splitData = splitDataState.filter(s => s.selected).map(s => ({
-                personId: s.personId,
-                share: s.share
-            }));
-            validateSplitData(amount, splitType, splitData);
+            // Convert % to actual amount before saving if it's a percent split
+            splitData = splitDataState.filter(s => s.selected).map(s => {
+                let actualShare = s.share;
+                if (currentSplitType === 'percent') {
+                    actualShare = roundToTwo(amount * (s.share / 100));
+                }
+                return { personId: s.personId, share: actualShare, rawValue: s.share, isSettled: false };
+            });
+            validateSplitData(amount, splitType, splitDataState.filter(s=>s.selected));
         }
         
         const expense = { id, amount, desc, category, date: dateStr, isSplit, splitType, splitData };
@@ -325,7 +320,6 @@ window.editExpense = function(id) {
     const catSelect = document.getElementById('exp-category');
     catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}" ${c.id === exp.category ? 'selected' : ''}>${c.name}</option>`).join('');
     
-    // Load Split Data
     const splitCheck = document.getElementById('exp-is-split');
     splitCheck.checked = !!exp.isSplit;
     document.getElementById('split-section').style.display = exp.isSplit ? 'block' : 'none';
@@ -335,7 +329,6 @@ window.editExpense = function(id) {
         document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.seg-btn[data-type="${currentSplitType}"]`).classList.add('active');
         
-        // Restore members
         splitDataState = [{personId: 'you', name: 'You', selected: false, share: 0}];
         state.people.forEach(p => splitDataState.push({personId: p.id, name: p.name, selected: false, share: 0}));
         
@@ -343,7 +336,8 @@ window.editExpense = function(id) {
             const target = splitDataState.find(s => s.personId === saved.personId);
             if (target) {
                 target.selected = true;
-                target.share = saved.share;
+                // If it was a percent split, restore the raw % value to the UI, not the calculated amount
+                target.share = exp.splitType === 'percent' && saved.rawValue ? saved.rawValue : saved.share;
             }
         });
         renderSplitMembers();
@@ -361,7 +355,7 @@ window.deleteExpenseFromModal = function() {
     showToast("Expense deleted");
 };
 
-// --- PEOPLE & SETTLEMENTS ---
+// --- PEOPLE & CATEGORIES ---
 window.savePerson = function(e) {
     e.preventDefault();
     const name = document.getElementById('person-name').value.trim();
@@ -375,14 +369,13 @@ window.savePerson = function(e) {
 window.deletePerson = function(id) {
     const inUse = state.expenses.some(e => e.isSplit && e.splitData && e.splitData.some(s => s.personId === id));
     if (inUse) {
-        alert("Cannot delete this person. They are part of existing expenses. Please delete the expenses first.");
+        alert("Cannot delete this person. They are part of existing expenses.");
         return;
     }
     state.people = state.people.filter(p => p.id !== id);
     saveState();
 };
 
-// --- CATEGORIES ---
 window.addCategory = function(e) {
     e.preventDefault();
     const name = document.getElementById('new-cat-name').value.trim();
@@ -403,18 +396,9 @@ window.deleteCategory = function(id) {
     saveState();
 };
 
-// --- BUDGET ---
-window.saveBudget = function(e) {
-    e.preventDefault();
-    state.budget = roundToTwo(document.getElementById('budget-amount').value);
-    saveState();
-    closeAllModals();
-};
-window.removeBudget = function() {
-    state.budget = 0;
-    saveState();
-    closeAllModals();
-};
+window.saveBudget = function(e) { e.preventDefault(); state.budget = roundToTwo(document.getElementById('budget-amount').value); saveState(); closeAllModals(); };
+window.removeBudget = function() { state.budget = 0; saveState(); closeAllModals(); };
+window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorage.removeItem(STORAGE_KEY); window.location.reload(); } };
 
 // --- IMPORT / EXPORT ---
 window.exportData = function() {
@@ -440,40 +424,108 @@ window.importData = function(event) {
             alert("Import successful!");
             window.location.reload();
         } catch (err) {
-            alert("Import failed: The file is invalid. Your data was not changed.");
+            alert("Import failed.");
         }
     };
     reader.readAsText(file);
 };
 
-window.clearAllData = function() {
-    if(confirm("Are you sure you want to delete ALL data? This cannot be undone.")) {
-        localStorage.removeItem(STORAGE_KEY);
-        window.location.reload();
-    }
+// --- SETTLEMENT CALCULATION LOGIC ---
+function getSettlementData() {
+    let toReceiveTotal = 0;
+    let personalSpend = 0;
+    let totalPaid = 0;
+    
+    // Map to hold what each person owes YOU
+    let peopleBalances = {}; 
+    state.people.forEach(p => {
+        peopleBalances[p.id] = { name: p.name, owes: 0, history: [] };
+    });
+
+    state.expenses.forEach(exp => {
+        if (!exp.isSplit) {
+            personalSpend += exp.amount;
+            totalPaid += exp.amount;
+        } else {
+            // It's a split expense
+            totalPaid += exp.amount; // Assuming YOU paid for it
+            
+            // Find your share
+            const myShareObj = exp.splitData.find(s => s.personId === 'you');
+            if (myShareObj) {
+                personalSpend += myShareObj.share;
+            }
+
+            // Find others' shares
+            exp.splitData.forEach(s => {
+                if (s.personId !== 'you' && peopleBalances[s.personId]) {
+                    // Only add to balance if it's not settled
+                    if (!s.isSettled) {
+                        peopleBalances[s.personId].owes += s.share;
+                        toReceiveTotal += s.share;
+                    }
+                    // Keep history regardless of settled state
+                    peopleBalances[s.personId].history.push({
+                        expId: exp.id,
+                        desc: exp.desc,
+                        date: exp.date,
+                        amount: s.share,
+                        isSettled: s.isSettled || false
+                    });
+                }
+            });
+        }
+    });
+
+    return { personalSpend, totalPaid, toReceiveTotal, peopleBalances };
 }
+
+window.markAsSettled = function(personId, expId) {
+    const exp = state.expenses.find(e => e.id === expId);
+    if (exp && exp.splitData) {
+        const share = exp.splitData.find(s => s.personId === personId);
+        if (share) {
+            share.isSettled = true;
+            saveState();
+            showToast("Marked as settled");
+        }
+    }
+};
+
+window.togglePersonHistory = function(personId) {
+    const el = document.getElementById(`history-${personId}`);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+};
+
 
 // --- RENDERERS ---
 function renderAll() {
     renderHome();
     renderExpensesList();
     renderCategoriesModal();
-    renderPeopleList();
+    renderSettlementsTab();
 }
 
 function renderHome() {
-    const totalSpend = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-    document.getElementById('home-my-spend').innerText = formatINR(totalSpend);
+    const data = getSettlementData();
+    
+    document.getElementById('home-my-spend').innerText = formatINR(data.personalSpend);
+    document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid);
+    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal);
     
     if (state.budget > 0) {
-        const left = state.budget - totalSpend;
+        const left = state.budget - data.personalSpend;
         document.getElementById('home-budget-left').innerText = formatINR(left);
         document.getElementById('home-budget-left').className = left < 0 ? 'mt-xs text-danger' : 'mt-xs text-primary';
     } else {
         document.getElementById('home-budget-left').innerText = 'Not Set';
     }
     
-    document.getElementById('analytics-total').innerText = formatINR(totalSpend);
+    document.getElementById('analytics-total').innerText = formatINR(data.personalSpend);
 }
 
 function renderExpensesList() {
@@ -520,8 +572,11 @@ function renderCategoriesModal() {
     `).join('');
 }
 
-function renderPeopleList() {
+function renderSettlementsTab() {
     const list = document.getElementById('people-list');
+    const data = getSettlementData();
+    
+    document.getElementById('settlements-total').innerText = formatINR(data.toReceiveTotal);
     document.getElementById('settlements-count').innerText = `${state.people.length} people`;
     
     if (state.people.length === 0) {
@@ -529,12 +584,52 @@ function renderPeopleList() {
         return;
     }
     
-    list.innerHTML = state.people.map(p => `
-        <div class="card p-md flex-between align-center">
-            <span class="font-medium">${p.name}</span>
-            <button class="btn-action-small text-danger" onclick="deletePerson('${p.id}')">Remove</button>
+    list.innerHTML = Object.keys(data.peopleBalances).map(personId => {
+        const p = data.peopleBalances[personId];
+        const owesText = p.owes > 0 ? `<strong class="text-danger">Owes you ${formatINR(p.owes)}</strong>` : `<span class="text-success text-sm">Settled</span>`;
+        
+        // Build History HTML
+        const historyHtml = p.history.length === 0 ? 
+            `<div class="text-center text-sm text-secondary p-sm">No split history with ${p.name}.</div>` : 
+            p.history.map(h => `
+                <div class="flex-between align-center p-sm border-bottom">
+                    <div>
+                        <div class="font-medium text-sm">${h.desc}</div>
+                        <div class="text-xs text-secondary">${h.date}</div>
+                    </div>
+                    <div class="flex-col align-center">
+                        <span class="font-bold ${h.isSettled ? 'text-secondary' : 'text-danger'}">${formatINR(h.amount)}</span>
+                        ${!h.isSettled ? `
+                            <button class="btn-action-small mt-xs text-success" onclick="markAsSettled('${personId}', '${h.expId}')">Mark Settled</button>
+                        ` : `<span class="text-xs text-success">Paid</span>`}
+                    </div>
+                </div>
+            `).join('');
+
+        return `
+        <div class="card p-0 mb-md overflow-hidden">
+            <div class="flex-between align-center p-md clickable" onclick="togglePersonHistory('${personId}')">
+                <div>
+                    <div class="font-medium">${p.name}</div>
+                    <div class="mt-xs">${owesText}</div>
+                </div>
+                <div class="flex-row gap-sm">
+                    <button class="btn-action-small text-danger" onclick="event.stopPropagation(); deletePerson('${personId}')">Remove</button>
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+            </div>
+            <div id="history-${personId}" class="bg-secondary" style="display:none; padding: var(--space-sm);">
+                ${p.history.length > 0 ? `
+                    <div class="flex-between align-center mb-sm px-sm">
+                        <span class="text-xs font-bold text-secondary">HISTORY</span>
+                        ${p.owes > 0 ? `<a href="upi://pay?pa=&pn=${p.name}&am=${p.owes}&cu=INR" class="text-xs text-primary font-bold" target="_blank">Send GPay Req</a>` : ''}
+                    </div>
+                ` : ''}
+                ${historyHtml}
+            </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function showToast(msg) {
