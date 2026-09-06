@@ -1,5 +1,5 @@
 /**
- * PocketSplit - Core Logic
+ * PocketSplit - Core Logic with Redesigned Settlement Workflow
  */
 
 // --- 1. STRICT IN-MEMORY AUTHENTICATION ---
@@ -16,6 +16,11 @@ let state = {
 
 let currentSplitType = 'equal';
 let splitDataState = []; 
+
+// Settlement UI State
+let settlementView = 'expense'; // 'expense' or 'person'
+let settlementFilter = 'all'; // 'all', 'need_request', 'request_sent', 'partially_paid', 'settled'
+let expandedExpenses = {}; // Track which expense cards are expanded { expId: boolean }
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -76,10 +81,12 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
-            // Ensure expenses array is clean
+            // Ensure expenses array is clean and has new properties
             state.expenses = state.expenses.map(e => ({
                 ...e,
                 amount: Number(e.amount),
+                gpayRequestStatus: e.gpayRequestStatus || 'not_sent',
+                gpayRequestSentAt: e.gpayRequestSentAt || null,
                 splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null
             }));
         }
@@ -276,6 +283,10 @@ window.saveExpense = function(e) {
         
         if (amount <= 0) throw new Error("Amount must be greater than 0");
         
+        const existingExp = state.expenses.find(ex => ex.id === id);
+        let gpayRequestStatus = existingExp ? existingExp.gpayRequestStatus : 'not_sent';
+        let gpayRequestSentAt = existingExp ? existingExp.gpayRequestSentAt : null;
+
         let splitType = 'none';
         let splitData = null;
 
@@ -286,8 +297,7 @@ window.saveExpense = function(e) {
                 if (currentSplitType === 'percent') {
                     actualShare = roundToTwo(amount * (s.share / 100));
                 }
-                // Keep the isSettled state if we are editing an existing expense
-                const existingExp = state.expenses.find(ex => ex.id === id);
+                
                 let existingSettledState = false;
                 if (existingExp && existingExp.splitData) {
                     const existingShare = existingExp.splitData.find(oldS => oldS.personId === s.personId);
@@ -299,11 +309,14 @@ window.saveExpense = function(e) {
             validateSplitData(amount, splitType, splitDataState.filter(s=>s.selected));
         }
         
-        const expense = { id, amount, desc, category, date: dateStr, isSplit, splitType, splitData };
+        const expense = { id, amount, desc, category, date: dateStr, isSplit, splitType, splitData, gpayRequestStatus, gpayRequestSentAt };
         
-        const existingIdx = state.expenses.findIndex(ex => ex.id === id);
-        if (existingIdx >= 0) state.expenses[existingIdx] = expense;
-        else state.expenses.push(expense);
+        if (existingExp) {
+            const idx = state.expenses.findIndex(ex => ex.id === id);
+            state.expenses[idx] = expense;
+        } else {
+            state.expenses.push(expense);
+        }
         
         saveState();
         closeAllModals();
@@ -436,15 +449,16 @@ window.importData = function(event) {
     reader.readAsText(file);
 };
 
-// --- SETTLEMENT CALCULATION LOGIC ---
+// --- AGGREGATION ENGINE ---
 function getSettlementData() {
     let toReceiveTotal = 0;
+    let collectedTotal = 0;
     let personalSpend = 0;
     let totalPaid = 0;
     
     let peopleBalances = {}; 
     state.people.forEach(p => {
-        peopleBalances[p.id] = { name: p.name, owes: 0, history: [] };
+        peopleBalances[p.id] = { name: p.name, owes: 0, paid: 0 };
     });
 
     state.expenses.forEach(exp => {
@@ -452,7 +466,7 @@ function getSettlementData() {
             personalSpend += exp.amount;
             totalPaid += exp.amount;
         } else {
-            totalPaid += exp.amount;
+            totalPaid += exp.amount; 
             
             const myShareObj = exp.splitData.find(s => s.personId === 'you');
             if (myShareObj) {
@@ -461,54 +475,95 @@ function getSettlementData() {
 
             exp.splitData.forEach(s => {
                 if (s.personId !== 'you' && peopleBalances[s.personId]) {
-                    if (!s.isSettled) {
+                    if (s.isSettled) {
+                        peopleBalances[s.personId].paid += s.share;
+                        collectedTotal += s.share;
+                    } else {
                         peopleBalances[s.personId].owes += s.share;
                         toReceiveTotal += s.share;
                     }
-                    peopleBalances[s.personId].history.push({
-                        expId: exp.id,
-                        desc: exp.desc,
-                        date: exp.date,
-                        amount: s.share,
-                        isSettled: s.isSettled || false
-                    });
                 }
             });
         }
     });
 
-    return { personalSpend, totalPaid, toReceiveTotal, peopleBalances };
+    return { 
+        personalSpend, 
+        totalPaid, 
+        toReceiveTotal, // This is Pending overall
+        collectedTotal, 
+        peopleBalances 
+    };
 }
 
-window.toggleSettleStatus = function(personId, expId, currentStatus) {
+// --- SETTLEMENTS UI REDESIGN ---
+window.setSettlementView = function(view) {
+    settlementView = view;
+    document.querySelectorAll('#view-settlements .seg-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`btn-view-${view}`).classList.add('active');
+    
+    const filters = document.getElementById('settlement-filters');
+    const topSummary = document.getElementById('settlements-top-summary');
+    
+    if (view === 'person') {
+        filters.style.display = 'none';
+        topSummary.style.display = 'none';
+    } else {
+        filters.style.display = 'flex';
+        topSummary.style.display = 'grid';
+    }
+    
+    renderSettlementsTab();
+};
+
+window.setSettlementFilter = function(filter) {
+    settlementFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+    document.querySelector(`.filter-chip[data-filter="${filter}"]`).classList.add('active');
+    renderSettlementsTab();
+};
+
+window.toggleExpenseExpand = function(expId) {
+    expandedExpenses[expId] = !expandedExpenses[expId];
+    renderSettlementsTab();
+};
+
+window.triggerGpayConfirm = function(expId) {
+    document.getElementById('gpay-confirm-exp-id').value = expId;
+    openModal('modal-gpay-confirm');
+};
+
+window.confirmGpayRequest = function() {
+    const expId = document.getElementById('gpay-confirm-exp-id').value;
+    const exp = state.expenses.find(e => e.id === expId);
+    if (exp) {
+        exp.gpayRequestStatus = 'sent';
+        exp.gpayRequestSentAt = new Date().toISOString();
+        saveState();
+        closeAllModals();
+        showToast("Marked as sent");
+    }
+};
+
+window.toggleParticipantPaid = function(expId, personId) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp && exp.splitData) {
         const share = exp.splitData.find(s => s.personId === personId);
         if (share) {
-            // Toggle the status
-            share.isSettled = !currentStatus;
+            share.isSettled = !share.isSettled;
             saveState();
-            showToast(share.isSettled ? "Marked as paid" : "Marked as unpaid");
         }
     }
 };
 
-window.togglePersonHistory = function(personId) {
-    const el = document.getElementById(`history-${personId}`);
-    if (el.style.display === 'none') {
-        el.style.display = 'block';
-    } else {
-        el.style.display = 'none';
-    }
-};
-
-
 // --- RENDERERS ---
 function renderAll() {
     renderHome();
-    renderExpensesList();
+    renderExpensesListFull();
     renderCategoriesModal();
-    renderSettlementsTab();
+    if (document.getElementById('view-settlements').classList.contains('active')) {
+        renderSettlementsTab();
+    }
 }
 
 function renderHome() {
@@ -516,7 +571,7 @@ function renderHome() {
     
     document.getElementById('home-my-spend').innerText = formatINR(data.personalSpend);
     document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid);
-    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal);
+    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal); // Pending
     
     if (state.budget > 0) {
         const left = state.budget - data.personalSpend;
@@ -527,22 +582,40 @@ function renderHome() {
     }
     
     document.getElementById('analytics-total').innerText = formatINR(data.personalSpend);
+    renderRecentExpenses();
 }
 
-function renderExpensesList() {
-    const list = document.getElementById('expenses-list');
+function renderRecentExpenses() {
     const recent = document.getElementById('recent-expenses-list');
+    if (state.expenses.length === 0) {
+        recent.innerHTML = `<div class="empty-state text-sm p-md">No expenses yet.</div>`;
+        return;
+    }
+    const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    recent.innerHTML = sorted.slice(0, 3).map(e => `
+        <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
+            <div class="expense-list-item-left">
+                <h3 class="m-0">${e.desc}</h3>
+                <span class="text-xs text-secondary">${e.date} ${e.isSplit ? '• Split' : ''}</span>
+            </div>
+            <strong class="text-primary">${formatINR(e.amount)}</strong>
+        </div>
+    `).join('');
+}
+
+function renderExpensesListFull() {
+    const list = document.getElementById('expenses-list');
+    if (!list) return;
     
     if (state.expenses.length === 0) {
         list.innerHTML = `<div class="empty-state">No expenses yet.</div>`;
-        recent.innerHTML = `<div class="empty-state text-sm p-md">No expenses yet.</div>`;
         return;
     }
     
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
-    const html = sorted.map(e => `
+    list.innerHTML = sorted.map(e => `
         <div class="card p-md flex-between align-center clickable" onclick="editExpense('${e.id}')">
-            <div>
+            <div class="expense-list-item-left">
                 <h3 class="m-0">${e.desc}</h3>
                 <span class="text-xs text-secondary">${e.date}</span>
                 ${e.isSplit ? '<span class="text-xs text-primary ml-sm">Split</span>' : ''}
@@ -550,18 +623,11 @@ function renderExpensesList() {
             <strong class="text-primary">${formatINR(e.amount)}</strong>
         </div>
     `).join('');
-    
-    list.innerHTML = html;
-    recent.innerHTML = sorted.slice(0, 3).map(e => `
-        <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
-            <span>${e.desc} ${e.isSplit ? '🔄' : ''}</span>
-            <strong class="text-primary">${formatINR(e.amount)}</strong>
-        </div>
-    `).join('');
 }
 
 function renderCategoriesModal() {
     const list = document.getElementById('category-manage-list');
+    if (!list) return;
     list.innerHTML = state.categories.map(c => `
         <div class="list-item p-sm border-bottom flex-between">
             <div class="flex-row align-center gap-sm">
@@ -574,60 +640,187 @@ function renderCategoriesModal() {
 }
 
 function renderSettlementsTab() {
-    const list = document.getElementById('people-list');
+    const container = document.getElementById('settlements-list-container');
+    if (!container) return;
+    
+    if (settlementView === 'person') {
+        renderSettlementByPerson(container);
+    } else {
+        renderSettlementByExpense(container);
+    }
+}
+
+function renderSettlementByExpense(container) {
     const data = getSettlementData();
     
-    document.getElementById('settlements-total').innerText = formatINR(data.toReceiveTotal);
-    document.getElementById('settlements-count').innerText = `${state.people.length} people`;
+    // Update top summary
+    document.getElementById('settlements-total').innerText = formatINR(data.toReceiveTotal + data.collectedTotal);
+    document.getElementById('settlements-collected').innerText = formatINR(data.collectedTotal);
+    document.getElementById('settlements-pending').innerText = formatINR(data.toReceiveTotal);
     
-    if (state.people.length === 0) {
-        list.innerHTML = `<div class="empty-state">No people added yet.</div>`;
+    // Get all split expenses where user is involved
+    let splitExps = state.expenses.filter(e => e.isSplit && e.splitData);
+    
+    // Process each for filtering and display
+    let displayList = [];
+    splitExps.forEach(exp => {
+        let expCollected = 0;
+        let expPending = 0;
+        let myShare = 0;
+        let participantsCount = 0;
+        let participantsData = [];
+        
+        exp.splitData.forEach(s => {
+            if (s.personId === 'you') {
+                myShare = s.share;
+            } else {
+                participantsCount++;
+                const pInfo = state.people.find(p => p.id === s.personId);
+                const pName = pInfo ? pInfo.name : 'Unknown';
+                participantsData.push({ id: s.personId, name: pName, share: s.share, isSettled: s.isSettled });
+                
+                if (s.isSettled) expCollected += s.share;
+                else expPending += s.share;
+            }
+        });
+        
+        const totalToReceive = expCollected + expPending;
+        if (totalToReceive === 0) return; // Not owed anything
+        
+        const gpaySent = exp.gpayRequestStatus === 'sent';
+        const isFullySettled = expPending === 0;
+        
+        // Apply Filter
+        let keep = false;
+        if (settlementFilter === 'all') keep = true;
+        else if (settlementFilter === 'need_request') keep = !isFullySettled && !gpaySent;
+        else if (settlementFilter === 'request_sent') keep = !isFullySettled && gpaySent && expCollected === 0;
+        else if (settlementFilter === 'partially_paid') keep = !isFullySettled && expCollected > 0 && expPending > 0;
+        else if (settlementFilter === 'settled') keep = isFullySettled;
+        
+        if (keep) {
+            displayList.push({
+                exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled
+            });
+        }
+    });
+    
+    // Sort Date Descending
+    displayList.sort((a,b) => new Date(b.exp.date) - new Date(a.exp.date));
+    
+    if (displayList.length === 0) {
+        container.innerHTML = `<div class="empty-state">No splits match this filter.</div>`;
         return;
     }
     
-    list.innerHTML = Object.keys(data.peopleBalances).map(personId => {
-        const p = data.peopleBalances[personId];
-        const owesText = p.owes > 0 ? `<strong class="text-danger">Owes you ${formatINR(p.owes)}</strong>` : `<span class="text-success text-sm">All Settled</span>`;
+    container.innerHTML = displayList.map(item => {
+        const { exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled } = item;
+        const isExpanded = !!expandedExpenses[exp.id];
         
-        // Sort history by date descending
-        const sortedHistory = p.history.sort((a,b) => new Date(b.date) - new Date(a.date));
-        
-        const historyHtml = sortedHistory.length === 0 ? 
-            `<div class="text-center text-sm text-secondary p-sm">No split history.</div>` : 
-            sortedHistory.map(h => {
-                const btnClass = h.isSettled ? "btn-action-small text-secondary" : "btn-action-small text-success";
-                const btnText = h.isSettled ? "Paid" : "Unpaid";
-                
-                return `
-                <div class="flex-between align-center p-sm border-bottom">
-                    <div>
-                        <div class="font-medium text-sm">${h.desc}</div>
-                        <div class="text-xs text-secondary">${h.date}</div>
-                    </div>
-                    <div class="flex-col align-center">
-                        <span class="font-bold ${h.isSettled ? 'text-secondary' : 'text-danger'}">${formatINR(h.amount)}</span>
-                        <button class="${btnClass} mt-xs" onclick="toggleSettleStatus('${personId}', '${h.expId}', ${h.isSettled})">${btnText}</button>
-                    </div>
-                </div>
-            `}).join('');
-
-        return `
-        <div class="card p-0 mb-md overflow-hidden">
-            <div class="flex-between align-center p-md clickable" onclick="togglePersonHistory('${personId}')">
+        // Participants HTML
+        const participantsHtml = participantsData.map(p => `
+            <div class="flex-between align-center py-sm border-bottom" style="padding-top: 8px; padding-bottom: 8px;">
                 <div>
-                    <div class="font-medium">${p.name}</div>
-                    <div class="mt-xs">${owesText}</div>
+                    <div class="font-medium text-sm">${p.name}</div>
+                    <div class="text-primary font-bold">${formatINR(p.share)}</div>
                 </div>
-                <div class="flex-row gap-sm">
-                    <button class="btn-action-small text-danger" onclick="event.stopPropagation(); deletePerson('${personId}')">Remove</button>
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--text-muted)" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <div>
+                    ${p.isSettled 
+                        ? `<button class="btn-action-small" onclick="toggleParticipantPaid('${exp.id}', '${p.id}')">✓ Paid</button>`
+                        : `<button class="btn-action-small" style="background:var(--bg-main);" onclick="toggleParticipantPaid('${exp.id}', '${p.id}')">● Pending</button>`
+                    }
                 </div>
             </div>
-            <div id="history-${personId}" class="bg-secondary" style="display:none; padding: var(--space-sm);">
-                <div class="flex-between align-center mb-sm px-sm">
-                    <span class="text-xs font-bold text-secondary">TRANSACTIONS</span>
+        `).join('');
+        
+        return `
+        <div class="card p-0 mb-md overflow-hidden">
+            <div class="p-md">
+                <div class="flex-between align-center mb-sm">
+                    <div class="expense-list-item-left">
+                        <h3 class="m-0">${exp.desc}</h3>
+                        <span class="text-xs text-secondary">${exp.date}</span>
+                    </div>
+                    <strong class="text-primary">${formatINR(exp.amount)}</strong>
                 </div>
-                ${historyHtml}
+                
+                <div class="flex-between align-center text-sm mb-xs">
+                    <span class="text-secondary">Paid by You</span>
+                    <span>Your share: <strong class="text-primary">${formatINR(myShare)}</strong></span>
+                </div>
+                <div class="flex-between align-center text-sm mb-md pb-md border-bottom">
+                    <span class="text-secondary">To receive</span>
+                    <strong class="text-success">${formatINR(totalToReceive)}</strong>
+                </div>
+
+                <div class="flex-between align-center mb-sm">
+                    <div>
+                        <div class="text-xs font-bold text-secondary mb-xs">GPay Group Request</div>
+                        ${gpaySent 
+                            ? `<span class="text-sm font-medium text-success">✓ Request Sent</span>` 
+                            : `<span class="text-sm font-medium text-warning">● Not Sent</span>`
+                        }
+                    </div>
+                    ${!gpaySent ? `<button class="btn-action-small" onclick="triggerGpayConfirm('${exp.id}')">Mark Request Sent</button>` : ''}
+                </div>
+                
+                <div class="flex-between align-center mt-md">
+                    <span class="text-xs text-secondary">${participantsCount} people • ${formatINR(expPending)} pending</span>
+                    <button class="btn-ghost text-primary text-sm p-0 font-medium" onclick="toggleExpenseExpand('${exp.id}')">${isExpanded ? 'Hide Split' : 'View Split'}</button>
+                </div>
+            </div>
+
+            ${isExpanded ? `
+                <div class="border-top p-md bg-secondary">
+                    <div class="text-xs font-bold text-secondary mb-xs">PAYMENT STATUS</div>
+                    ${participantsHtml}
+                    <div class="pt-sm mt-sm">
+                        <div class="flex-between text-sm mb-xs">
+                            <span class="text-secondary">Collected</span>
+                            <strong class="text-success">${formatINR(expCollected)}</strong>
+                        </div>
+                        <div class="flex-between text-sm">
+                            <span class="text-secondary">Pending</span>
+                            <strong class="${expPending > 0 ? 'text-danger' : 'text-secondary'}">${formatINR(expPending)}</strong>
+                        </div>
+                        ${isFullySettled ? `<div class="mt-md text-center text-success font-bold text-sm">✓ Fully Settled</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+        `;
+    }).join('');
+}
+
+function renderSettlementByPerson(container) {
+    const data = getSettlementData();
+    
+    if (state.people.length === 0) {
+        container.innerHTML = `<div class="empty-state">No people added yet.</div>`;
+        return;
+    }
+    
+    container.innerHTML = Object.keys(data.peopleBalances).map(personId => {
+        const p = data.peopleBalances[personId];
+        const totalOwed = p.owes + p.paid;
+        
+        return `
+        <div class="card mb-sm">
+            <div class="flex-between align-center mb-sm">
+                <span class="font-medium">${p.name}</span>
+                <button class="btn-ghost text-danger text-xs p-0" onclick="deletePerson('${personId}')">Remove</button>
+            </div>
+            <div class="flex-between text-sm border-top pt-sm mt-sm">
+                <span class="text-secondary">Total Owed</span>
+                <strong>${formatINR(totalOwed)}</strong>
+            </div>
+            <div class="flex-between text-sm mt-xs">
+                <span class="text-secondary">Paid</span>
+                <strong class="text-success">${formatINR(p.paid)}</strong>
+            </div>
+            <div class="flex-between text-sm mt-xs">
+                <span class="text-secondary">Pending</span>
+                <strong class="text-danger">${formatINR(p.owes)}</strong>
             </div>
         </div>
         `;

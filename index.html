@@ -19,7 +19,7 @@
             <h1>PocketSplit</h1>
             <p class="text-secondary mb-xl">Your personal expense companion</p>
             
-            <form onsubmit="handleLogin(event)" class="w-100">
+            <form onsubmit="handleLogin(event)" class="w-100 px-md">
                 <input type="password" id="access-code" placeholder="Enter access code" class="input-lg text-center mb-md" required>
                 <p id="login-error" class="text-danger text-sm mb-md" style="display:none;">Invalid access code</p>
                 <button type="submit" class="btn btn-primary w-100">Continue</button>
@@ -97,11 +97,6 @@
                     </div>
                 </div>
 
-                <div id="gpay-section" class="mb-lg" style="display:none;">
-                    <h3 class="section-title mb-md">GPay Requests</h3>
-                    <div id="gpay-list" class="flex-col gap-sm"></div>
-                </div>
-
                 <div class="flex-between align-center mb-md">
                     <h3 class="section-title">Recent Expenses</h3>
                     <button class="btn-ghost text-primary text-sm font-medium" onclick="switchTab('expenses')">View All</button>
@@ -115,27 +110,54 @@
                 <div class="filter-bar mb-md">
                     <div class="search-input-wrapper flex-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <input type="text" id="expense-search" placeholder="Search expenses..." oninput="renderExpenses()">
+                        <input type="text" id="expense-search" placeholder="Search expenses..." oninput="renderExpensesListFull()">
                     </div>
-                    <input type="month" id="expense-month" class="input-standard" onchange="renderExpenses()">
+                    <input type="month" id="expense-month" class="input-standard" style="width: auto;" onchange="renderExpensesListFull()">
                 </div>
                 <div id="expenses-list" class="flex-col gap-sm pb-xl"></div>
             </section>
 
-            <!-- 3. SETTLEMENTS VIEW -->
+            <!-- 3. SETTLEMENTS VIEW (REDESIGNED) -->
             <section id="view-settlements" class="view">
                 <div class="flex-between align-center mb-md">
+                    <h1 class="page-title mobile-only">Settlements</h1>
                     <h1 class="page-title desktop-only">Settlements</h1>
                     <button class="btn btn-secondary btn-sm ml-auto" onclick="openModal('modal-person')">+ Add Person</button>
                 </div>
                 
-                <div class="card mb-lg text-center p-lg shadow-sm border-0">
-                    <span class="text-secondary text-sm">You should receive</span>
-                    <h2 id="settlements-total" class="text-success mt-xs mb-xs" style="font-size: 2.2rem;">₹0</h2>
-                    <span id="settlements-count" class="text-muted text-sm">0 people</span>
+                <!-- View Toggle -->
+                <div class="segmented-control mb-md">
+                    <button type="button" class="seg-btn active" id="btn-view-expense" onclick="setSettlementView('expense')">By Expense</button>
+                    <button type="button" class="seg-btn" id="btn-view-person" onclick="setSettlementView('person')">By Person</button>
                 </div>
 
-                <div id="people-list" class="flex-col gap-md pb-xl"></div>
+                <!-- Top Summary (Expense View Default) -->
+                <div id="settlements-top-summary" class="grid-3 gap-sm mb-md text-center">
+                    <div class="card p-sm">
+                        <div class="text-xs text-secondary">To Receive</div>
+                        <div class="font-bold text-primary mt-xs" id="settlements-total">₹0</div>
+                    </div>
+                    <div class="card p-sm">
+                        <div class="text-xs text-secondary">Collected</div>
+                        <div class="font-bold text-success mt-xs" id="settlements-collected">₹0</div>
+                    </div>
+                    <div class="card p-sm">
+                        <div class="text-xs text-secondary">Pending</div>
+                        <div class="font-bold text-danger mt-xs" id="settlements-pending">₹0</div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div id="settlement-filters" class="filter-scroll mb-md">
+                    <button class="filter-chip active" data-filter="all" onclick="setSettlementFilter('all')">All</button>
+                    <button class="filter-chip" data-filter="need_request" onclick="setSettlementFilter('need_request')">Need Request</button>
+                    <button class="filter-chip" data-filter="request_sent" onclick="setSettlementFilter('request_sent')">Request Sent</button>
+                    <button class="filter-chip" data-filter="partially_paid" onclick="setSettlementFilter('partially_paid')">Partially Paid</button>
+                    <button class="filter-chip" data-filter="settled" onclick="setSettlementFilter('settled')">Settled</button>
+                </div>
+
+                <!-- Main List Area -->
+                <div id="settlements-list-container" class="flex-col gap-md pb-xl"></div>
             </section>
 
             <!-- 4. ANALYTICS VIEW -->
@@ -190,7 +212,7 @@
                     </div>
                 </div>
                 
-                <p class="text-center text-muted text-sm">PocketSplit v1.1.0</p>
+                <p class="text-center text-muted text-sm">PocketSplit v1.2.0</p>
             </section>
         </main>
 
@@ -292,6 +314,22 @@
                     <button type="submit" class="btn btn-primary flex-2">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Confirm GPay Request Modal -->
+    <div class="modal center-modal" id="modal-gpay-confirm">
+        <div class="modal-header">
+            <h3>Confirm Request</h3>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body text-center">
+            <p class="mb-lg">Mark GPay group request as sent?</p>
+            <input type="hidden" id="gpay-confirm-exp-id">
+            <div class="flex-row gap-sm">
+                <button class="btn btn-secondary flex-1" onclick="closeAllModals()">Cancel</button>
+                <button class="btn btn-primary flex-1" onclick="confirmGpayRequest()">Confirm</button>
+            </div>
         </div>
     </div>
 
