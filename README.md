@@ -1,57 +1,14 @@
-# PocketSplit — Complete V1
+# PocketSplit Audit Fixes
 
-Responsive personal finance and friend-splitting PWA.
+This archive contains the corrected code snippets and files required to patch the PocketSplit application based on the audit.
 
-## Included
-- Dashboard and monthly budget
-- Expense entry with date, category, payment method
-- Day-wise transaction history
-- Search + category filters
-- Shared expenses with automatic equal split calculation
-- Friends and balances
-- Settlement action
-- Spending analytics
-- Local persistence via localStorage
-- JSON export/import backup
-- Reset data
-- PWA manifest + service worker
-- Mobile, tablet and desktop responsive layout
+## Files Included:
+1. `sw.js` - The hardened Service Worker (replaces your current sw.js).
+2. `pocket-split-fixes.js` - Contains the patched functions (Auth, Math, Date, Form, Import/Export). 
+   You can either include this file directly in your `index.html` or merge its contents into your main JavaScript file.
+3. `integration-guide.md` - Instructions on how to integrate these fixes into your existing codebase.
 
-## Run
-npm install
-npm run dev
-
-## Production build
-npm run build
-
-The `dist/` folder can be deployed to GitHub Pages or another static host.
-
-## Suggested V2
-- Unequal/custom shares
-- Multiple currencies
-- Recurring expenses/subscriptions
-- Income tracking
-- Bank/UPI CSV import
-- Monthly reports
-- PIN/biometric app lock
-- Cloud sync across devices
-- Authentication
-- Notifications/reminders
-- Debt history and partial settlements
-- Attach receipts/photos
-- Advanced charts
-
-
-## GitHub Pages deployment
-
-This project includes `.github/workflows/deploy.yml`.
-
-1. Create a GitHub repository named `pocketsplit`.
-2. Upload the project files to the repository root.
-3. Push/commit to the `main` branch.
-4. Open **Settings → Pages** and set **Source** to **GitHub Actions**.
-5. GitHub Actions will build and deploy the site automatically.
-6. Your project site will normally be:
-   `https://YOUR_GITHUB_USERNAME.github.io/pocketsplit/`
-
-The Vite `base` is already configured as `/pocketsplit/`.
+## Quick Start
+1. Overwrite your existing `sw.js` with the one provided here.
+2. Open your `index.html` and add `<script src="pocket-split-fixes.js"></script>` right before your main app.js script.
+3. Update your main app script to use `window.POCKETSPLIT_AUTH.isUnlocked` instead of localStorage for the lock screen check.
