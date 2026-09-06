@@ -60,9 +60,33 @@
     --overlay: rgba(0,0,0,0.7);
 }
 
-/* Reset */
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; width: 100%; background-color: var(--bg-main); color: var(--text-primary); font-size: 16px; line-height: 1.5; overflow: hidden; }
+/* Reset - STRICT FIX FOR SIZING BUG */
+*, *::before, *::after { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+}
+
+html {
+    font-size: 16px; /* FORCE base font size to 16px so rem units work correctly */
+}
+
+body { 
+    height: 100vh; 
+    width: 100vw; 
+    background-color: var(--bg-main); 
+    color: var(--text-primary); 
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.5; 
+    overflow: hidden; 
+    -webkit-tap-highlight-color: transparent; 
+}
+
+/* SVG Size Enforcement (Fixes massive icons) */
+svg {
+    max-width: 100%;
+    height: auto;
+}
 
 /* Utilities */
 h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
@@ -114,6 +138,7 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 .pt-md { padding-top: var(--space-md); }
 .pb-xl { padding-bottom: 120px; } 
 
+.py-sm { padding-top: var(--space-sm); padding-bottom: var(--space-sm); }
 .px-sm { padding-left: var(--space-sm); padding-right: var(--space-sm); }
 .px-md { padding-left: var(--space-md); padding-right: var(--space-md); }
 
@@ -151,7 +176,9 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 .btn-action-small:active { opacity: 0.7; transform: scale(0.95); }
 .btn-action-small.active { background: var(--success); color: white; border-color: var(--success); }
 
-.icon-btn { background: transparent; border: none; color: var(--text-secondary); width: 40px; height: 40px; border-radius: var(--radius-full); display: flex; justify-content: center; align-items: center; cursor: pointer; }
+/* FIXED ICON BTN SIZING */
+.icon-btn { background: transparent; border: none; color: var(--text-secondary); width: 40px; height: 40px; border-radius: var(--radius-full); display: flex; justify-content: center; align-items: center; cursor: pointer; padding: 8px; }
+.icon-btn svg { width: 24px; height: 24px; }
 .icon-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
 
 .fab { position: fixed; bottom: calc(85px + env(safe-area-inset-bottom)); right: var(--space-lg); width: 56px; height: 56px; border-radius: var(--radius-full); background: var(--primary); color: white; border: none; box-shadow: var(--shadow-md); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 90; transition: transform 0.2s; }
@@ -204,10 +231,22 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 .empty-state { padding: var(--space-xl) var(--space-md); text-align: center; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; border-radius: var(--radius-lg); border: 1px dashed var(--border); }
 .empty-state svg { width: 48px; height: 48px; margin-bottom: var(--space-md); stroke: var(--text-muted); stroke-width: 1.5; }
 
+/* Analytics Chart */
+.pie-chart { width: 160px; height: 160px; border-radius: 50%; background: var(--border); transition: background 0.3s; margin: 0 auto; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink:0; }
+
+/* FIXED LOGIN SCREEN LOGO SIZING */
+#login-screen { position: fixed; inset: 0; background: var(--bg-main); display: none; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-lg); }
+#login-screen.active { display: flex; }
+.login-container { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.login-logo { width: 64px; height: 64px; background: var(--primary-light); border-radius: var(--radius-xl); display: flex; justify-content: center; align-items: center; margin-bottom: var(--space-lg); padding: 16px;}
+.login-logo svg { width: 32px; height: 32px; } /* Explicit pixel sizes prevent blowout */
+
 /* Layouts (Mobile vs Desktop) */
 #app-shell { display: flex; height: 100vh; width: 100vw; overflow: hidden; background: var(--bg-main); }
 #sidebar { display: none; width: 260px; background: var(--bg-surface); border-right: 1px solid var(--border); flex-direction: column; }
 .sidebar-header { padding: var(--space-lg); display: flex; align-items: center; gap: var(--space-sm); border-bottom: 1px solid var(--border); }
+.sidebar-header svg { width: 24px; height: 24px; }
 .sidebar-nav { padding: var(--space-md) 0; flex: 1; overflow-y: auto; }
 .sidebar-nav .nav-item { display: flex; align-items: center; gap: var(--space-md); padding: 12px var(--space-lg); width: 100%; border: none; background: transparent; color: var(--text-secondary); font-size: 1rem; font-weight: 500; cursor: pointer; transition: 0.2s; text-align: left; }
 .sidebar-nav .nav-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
@@ -220,7 +259,7 @@ h3 { font-size: 1.1rem; font-weight: 600; }
 
 @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Bottom Nav */
+/* FIXED BOTTOM NAV SIZING */
 #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(65px + env(safe-area-inset-bottom)); background: var(--bg-surface); border-top: 1px solid var(--border); display: flex; justify-content: space-between; padding: 0 var(--space-sm) env(safe-area-inset-bottom) var(--space-sm); z-index: 50; }
 #bottom-nav .nav-item { flex: 1; background: none; border: none; color: var(--text-secondary); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; cursor: pointer; padding: 8px 0; }
 #bottom-nav .nav-item svg { width: 22px; height: 22px; stroke-width: 2; }

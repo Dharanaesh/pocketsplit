@@ -1,5 +1,5 @@
 /**
- * PocketSplit - Core Logic with Redesigned Settlement Workflow
+ * PocketSplit - Core Logic with Redesigned Settlement Workflow & Bug Fixes
  */
 
 // --- 1. STRICT IN-MEMORY AUTHENTICATION ---
@@ -10,7 +10,7 @@ const PIN_KEY = 'pocketSplit_accessCode';
 let state = {
     expenses: [],
     people: [],
-    categories: [{ id: 'c1', name: 'General', color: '#5B5FEF' }],
+    categories: [],
     budget: 0
 };
 
@@ -18,9 +18,9 @@ let currentSplitType = 'equal';
 let splitDataState = []; 
 
 // Settlement UI State
-let settlementView = 'expense'; // 'expense' or 'person'
-let settlementFilter = 'all'; // 'all', 'need_request', 'request_sent', 'partially_paid', 'settled'
-let expandedExpenses = {}; // Track which expense cards are expanded { expId: boolean }
+let settlementView = 'expense'; 
+let settlementFilter = 'all'; 
+let expandedExpenses = {}; 
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -81,7 +81,7 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
-            // Ensure expenses array is clean and has new properties
+            // Ensure expenses array is clean
             state.expenses = state.expenses.map(e => ({
                 ...e,
                 amount: Number(e.amount),
@@ -89,9 +89,17 @@ function loadState() {
                 gpayRequestSentAt: e.gpayRequestSentAt || null,
                 splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null
             }));
+            // Safe fallback if categories were wiped
+            if (!state.categories || state.categories.length === 0) {
+                state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
+            }
+        } else {
+            // Fresh State
+            state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
         }
     } catch (e) {
         console.error("Corrupted local storage. Starting fresh.");
+        state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
     }
 }
 
@@ -109,6 +117,7 @@ window.switchTab = function(tabId) {
         if (n.dataset.target === tabId) n.classList.add('active');
         else n.classList.remove('active');
     });
+    renderAll(); // Ensure data is fresh on tab switch
 };
 
 window.toggleTheme = function() {
@@ -490,13 +499,13 @@ function getSettlementData() {
     return { 
         personalSpend, 
         totalPaid, 
-        toReceiveTotal, // This is Pending overall
+        toReceiveTotal, // Pending overall
         collectedTotal, 
         peopleBalances 
     };
 }
 
-// --- SETTLEMENTS UI REDESIGN ---
+// --- SETTLEMENTS UI LOGIC ---
 window.setSettlementView = function(view) {
     settlementView = view;
     document.querySelectorAll('#view-settlements .seg-btn').forEach(btn => btn.classList.remove('active'));
@@ -564,24 +573,41 @@ function renderAll() {
     if (document.getElementById('view-settlements').classList.contains('active')) {
         renderSettlementsTab();
     }
+    if (document.getElementById('view-analytics').classList.contains('active')) {
+        renderAnalytics();
+    }
 }
 
 function renderHome() {
     const data = getSettlementData();
     
-    document.getElementById('home-my-spend').innerText = formatINR(data.personalSpend);
-    document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid);
-    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal); // Pending
+    // FIX: Budget should be based strictly on THIS MONTH's spending
+    const currentMonth = new Date().toISOString().slice(0,7); 
+    let monthPersonalSpend = 0;
+    
+    state.expenses.forEach(exp => {
+        if (exp.date.startsWith(currentMonth)) {
+            if (!exp.isSplit) {
+                monthPersonalSpend += exp.amount;
+            } else {
+                const myShareObj = exp.splitData.find(s => s.personId === 'you');
+                if (myShareObj) monthPersonalSpend += myShareObj.share;
+            }
+        }
+    });
+    
+    document.getElementById('home-my-spend').innerText = formatINR(monthPersonalSpend);
+    document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid); // All time paid
+    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal); // All time pending
     
     if (state.budget > 0) {
-        const left = state.budget - data.personalSpend;
+        const left = state.budget - monthPersonalSpend;
         document.getElementById('home-budget-left').innerText = formatINR(left);
         document.getElementById('home-budget-left').className = left < 0 ? 'mt-xs text-danger' : 'mt-xs text-primary';
     } else {
         document.getElementById('home-budget-left').innerText = 'Not Set';
     }
     
-    document.getElementById('analytics-total').innerText = formatINR(data.personalSpend);
     renderRecentExpenses();
 }
 
@@ -603,16 +629,35 @@ function renderRecentExpenses() {
     `).join('');
 }
 
-function renderExpensesListFull() {
+// FIX: Added Search and Month Filtering functionality
+window.renderExpensesListFull = function() {
     const list = document.getElementById('expenses-list');
     if (!list) return;
     
-    if (state.expenses.length === 0) {
-        list.innerHTML = `<div class="empty-state">No expenses yet.</div>`;
+    const searchInput = document.getElementById('expense-search');
+    const monthInput = document.getElementById('expense-month');
+    
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const monthTerm = monthInput ? monthInput.value : '';
+    
+    let filtered = state.expenses;
+    
+    if (searchTerm) {
+        filtered = filtered.filter(e => 
+            e.desc.toLowerCase().includes(searchTerm) || 
+            e.amount.toString().includes(searchTerm)
+        );
+    }
+    if (monthTerm) {
+        filtered = filtered.filter(e => e.date.startsWith(monthTerm));
+    }
+    
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty-state">No expenses found.</div>`;
         return;
     }
     
-    const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
     list.innerHTML = sorted.map(e => `
         <div class="card p-md flex-between align-center clickable" onclick="editExpense('${e.id}')">
             <div class="expense-list-item-left">
@@ -653,16 +698,13 @@ function renderSettlementsTab() {
 function renderSettlementByExpense(container) {
     const data = getSettlementData();
     
-    // Update top summary
     document.getElementById('settlements-total').innerText = formatINR(data.toReceiveTotal + data.collectedTotal);
     document.getElementById('settlements-collected').innerText = formatINR(data.collectedTotal);
     document.getElementById('settlements-pending').innerText = formatINR(data.toReceiveTotal);
     
-    // Get all split expenses where user is involved
     let splitExps = state.expenses.filter(e => e.isSplit && e.splitData);
-    
-    // Process each for filtering and display
     let displayList = [];
+    
     splitExps.forEach(exp => {
         let expCollected = 0;
         let expPending = 0;
@@ -685,12 +727,11 @@ function renderSettlementByExpense(container) {
         });
         
         const totalToReceive = expCollected + expPending;
-        if (totalToReceive === 0) return; // Not owed anything
+        if (totalToReceive === 0) return; 
         
         const gpaySent = exp.gpayRequestStatus === 'sent';
         const isFullySettled = expPending === 0;
         
-        // Apply Filter
         let keep = false;
         if (settlementFilter === 'all') keep = true;
         else if (settlementFilter === 'need_request') keep = !isFullySettled && !gpaySent;
@@ -705,7 +746,6 @@ function renderSettlementByExpense(container) {
         }
     });
     
-    // Sort Date Descending
     displayList.sort((a,b) => new Date(b.exp.date) - new Date(a.exp.date));
     
     if (displayList.length === 0) {
@@ -717,7 +757,6 @@ function renderSettlementByExpense(container) {
         const { exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled } = item;
         const isExpanded = !!expandedExpenses[exp.id];
         
-        // Participants HTML
         const participantsHtml = participantsData.map(p => `
             <div class="flex-between align-center py-sm border-bottom" style="padding-top: 8px; padding-bottom: 8px;">
                 <div>
@@ -825,6 +864,71 @@ function renderSettlementByPerson(container) {
         </div>
         `;
     }).join('');
+}
+
+// FIX: Added previously missing Analytics render function
+function renderAnalytics() {
+    const currentMonth = new Date().toISOString().slice(0,7); 
+    let monthSpend = 0;
+    let categoryTotals = {};
+    
+    state.categories.forEach(c => categoryTotals[c.id] = { name: c.name, color: c.color, amount: 0 });
+
+    state.expenses.forEach(exp => {
+        if (exp.date.startsWith(currentMonth)) {
+            let myCost = exp.amount;
+            if (exp.isSplit && exp.splitData) {
+                const myShareObj = exp.splitData.find(s => s.personId === 'you');
+                myCost = myShareObj ? myShareObj.share : 0;
+            }
+            monthSpend += myCost;
+            if (categoryTotals[exp.category]) {
+                categoryTotals[exp.category].amount += myCost;
+            }
+        }
+    });
+
+    const totalEl = document.getElementById('analytics-total');
+    if (totalEl) totalEl.innerText = formatINR(monthSpend);
+
+    const pieChart = document.getElementById('pie-chart');
+    const pieLegend = document.getElementById('pie-legend');
+    if (!pieChart || !pieLegend) return;
+
+    if (monthSpend === 0) {
+        pieChart.style.background = 'var(--border)';
+        pieLegend.innerHTML = '<p class="text-center text-secondary text-sm mt-md">No spending this month.</p>';
+        return;
+    }
+
+    let gradientStr = [];
+    let currentAngle = 0;
+    let legendHtml = '';
+
+    const catArr = Object.values(categoryTotals).filter(c => c.amount > 0).sort((a,b) => b.amount - a.amount);
+
+    catArr.forEach(c => {
+        const percentage = (c.amount / monthSpend) * 100;
+        const angle = (percentage / 100) * 360;
+        gradientStr.push(`${c.color} ${currentAngle}deg ${currentAngle + angle}deg`);
+        currentAngle += angle;
+
+        legendHtml += `
+            <div class="flex-between align-center border-bottom py-sm">
+                <div class="flex-row align-center gap-sm">
+                    <span class="legend-dot" style="background-color: ${c.color}"></span>
+                    <span class="text-sm font-medium">${c.name}</span>
+                </div>
+                <div class="flex-col" style="align-items: flex-end;">
+                    <span class="font-bold text-sm">${formatINR(c.amount)}</span>
+                    <span class="text-xs text-secondary">${percentage.toFixed(1)}%</span>
+                </div>
+            </div>
+        `;
+    });
+
+    pieChart.style.background = `conic-gradient(${gradientStr.join(', ')})`;
+    pieLegend.innerHTML = legendHtml;
 }
 
 function showToast(msg) {
