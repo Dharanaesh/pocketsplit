@@ -1,9 +1,10 @@
-const CACHE_VERSION = 'pocketsplit-cache-v2';
+const CACHE_VERSION = 'pocketsplit-cache-v3';
 const ASSETS = [
     '/pocketsplit/',
     '/pocketsplit/index.html',
-    '/pocketsplit/manifest.json'
-    // Add exact paths to your css and js files here
+    '/pocketsplit/manifest.json',
+    '/pocketsplit/js/app.js'
+    // Add your CSS and image paths here
 ];
 
 self.addEventListener('install', (e) => {
@@ -27,6 +28,8 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
         caches.match(e.request).then((response) => {
             return response || fetch(e.request);
+        }).catch(() => {
+            // Offline fallback logic here if needed
         })
     );
 });
