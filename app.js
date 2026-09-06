@@ -281,13 +281,20 @@ window.saveExpense = function(e) {
 
         if (isSplit) {
             splitType = currentSplitType;
-            // Convert % to actual amount before saving if it's a percent split
             splitData = splitDataState.filter(s => s.selected).map(s => {
                 let actualShare = s.share;
                 if (currentSplitType === 'percent') {
                     actualShare = roundToTwo(amount * (s.share / 100));
                 }
-                return { personId: s.personId, share: actualShare, rawValue: s.share, isSettled: false };
+                // Keep the isSettled state if we are editing an existing expense
+                const existingExp = state.expenses.find(ex => ex.id === id);
+                let existingSettledState = false;
+                if (existingExp && existingExp.splitData) {
+                    const existingShare = existingExp.splitData.find(oldS => oldS.personId === s.personId);
+                    if (existingShare) existingSettledState = existingShare.isSettled;
+                }
+                
+                return { personId: s.personId, share: actualShare, rawValue: s.share, isSettled: existingSettledState };
             });
             validateSplitData(amount, splitType, splitDataState.filter(s=>s.selected));
         }
@@ -336,7 +343,6 @@ window.editExpense = function(id) {
             const target = splitDataState.find(s => s.personId === saved.personId);
             if (target) {
                 target.selected = true;
-                // If it was a percent split, restore the raw % value to the UI, not the calculated amount
                 target.share = exp.splitType === 'percent' && saved.rawValue ? saved.rawValue : saved.share;
             }
         });
@@ -436,7 +442,6 @@ function getSettlementData() {
     let personalSpend = 0;
     let totalPaid = 0;
     
-    // Map to hold what each person owes YOU
     let peopleBalances = {}; 
     state.people.forEach(p => {
         peopleBalances[p.id] = { name: p.name, owes: 0, history: [] };
@@ -447,24 +452,19 @@ function getSettlementData() {
             personalSpend += exp.amount;
             totalPaid += exp.amount;
         } else {
-            // It's a split expense
-            totalPaid += exp.amount; // Assuming YOU paid for it
+            totalPaid += exp.amount;
             
-            // Find your share
             const myShareObj = exp.splitData.find(s => s.personId === 'you');
             if (myShareObj) {
                 personalSpend += myShareObj.share;
             }
 
-            // Find others' shares
             exp.splitData.forEach(s => {
                 if (s.personId !== 'you' && peopleBalances[s.personId]) {
-                    // Only add to balance if it's not settled
                     if (!s.isSettled) {
                         peopleBalances[s.personId].owes += s.share;
                         toReceiveTotal += s.share;
                     }
-                    // Keep history regardless of settled state
                     peopleBalances[s.personId].history.push({
                         expId: exp.id,
                         desc: exp.desc,
@@ -480,14 +480,15 @@ function getSettlementData() {
     return { personalSpend, totalPaid, toReceiveTotal, peopleBalances };
 }
 
-window.markAsSettled = function(personId, expId) {
+window.toggleSettleStatus = function(personId, expId, currentStatus) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp && exp.splitData) {
         const share = exp.splitData.find(s => s.personId === personId);
         if (share) {
-            share.isSettled = true;
+            // Toggle the status
+            share.isSettled = !currentStatus;
             saveState();
-            showToast("Marked as settled");
+            showToast(share.isSettled ? "Marked as paid" : "Marked as unpaid");
         }
     }
 };
@@ -586,12 +587,18 @@ function renderSettlementsTab() {
     
     list.innerHTML = Object.keys(data.peopleBalances).map(personId => {
         const p = data.peopleBalances[personId];
-        const owesText = p.owes > 0 ? `<strong class="text-danger">Owes you ${formatINR(p.owes)}</strong>` : `<span class="text-success text-sm">Settled</span>`;
+        const owesText = p.owes > 0 ? `<strong class="text-danger">Owes you ${formatINR(p.owes)}</strong>` : `<span class="text-success text-sm">All Settled</span>`;
         
-        // Build History HTML
-        const historyHtml = p.history.length === 0 ? 
-            `<div class="text-center text-sm text-secondary p-sm">No split history with ${p.name}.</div>` : 
-            p.history.map(h => `
+        // Sort history by date descending
+        const sortedHistory = p.history.sort((a,b) => new Date(b.date) - new Date(a.date));
+        
+        const historyHtml = sortedHistory.length === 0 ? 
+            `<div class="text-center text-sm text-secondary p-sm">No split history.</div>` : 
+            sortedHistory.map(h => {
+                const btnClass = h.isSettled ? "btn-action-small text-secondary" : "btn-action-small text-success";
+                const btnText = h.isSettled ? "Paid" : "Unpaid";
+                
+                return `
                 <div class="flex-between align-center p-sm border-bottom">
                     <div>
                         <div class="font-medium text-sm">${h.desc}</div>
@@ -599,12 +606,10 @@ function renderSettlementsTab() {
                     </div>
                     <div class="flex-col align-center">
                         <span class="font-bold ${h.isSettled ? 'text-secondary' : 'text-danger'}">${formatINR(h.amount)}</span>
-                        ${!h.isSettled ? `
-                            <button class="btn-action-small mt-xs text-success" onclick="markAsSettled('${personId}', '${h.expId}')">Mark Settled</button>
-                        ` : `<span class="text-xs text-success">Paid</span>`}
+                        <button class="${btnClass} mt-xs" onclick="toggleSettleStatus('${personId}', '${h.expId}', ${h.isSettled})">${btnText}</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
         return `
         <div class="card p-0 mb-md overflow-hidden">
@@ -619,12 +624,9 @@ function renderSettlementsTab() {
                 </div>
             </div>
             <div id="history-${personId}" class="bg-secondary" style="display:none; padding: var(--space-sm);">
-                ${p.history.length > 0 ? `
-                    <div class="flex-between align-center mb-sm px-sm">
-                        <span class="text-xs font-bold text-secondary">HISTORY</span>
-                        ${p.owes > 0 ? `<a href="upi://pay?pa=&pn=${p.name}&am=${p.owes}&cu=INR" class="text-xs text-primary font-bold" target="_blank">Send GPay Req</a>` : ''}
-                    </div>
-                ` : ''}
+                <div class="flex-between align-center mb-sm px-sm">
+                    <span class="text-xs font-bold text-secondary">TRANSACTIONS</span>
+                </div>
                 ${historyHtml}
             </div>
         </div>
