@@ -1,5 +1,5 @@
 /**
- * PocketSplit - Core Logic with Redesigned Settlement Workflow & Bug Fixes
+ * PocketSplit - Core Logic
  */
 
 // --- 1. STRICT IN-MEMORY AUTHENTICATION ---
@@ -81,7 +81,6 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
-            // Ensure expenses array is clean
             state.expenses = state.expenses.map(e => ({
                 ...e,
                 amount: Number(e.amount),
@@ -89,12 +88,10 @@ function loadState() {
                 gpayRequestSentAt: e.gpayRequestSentAt || null,
                 splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null
             }));
-            // Safe fallback if categories were wiped
             if (!state.categories || state.categories.length === 0) {
                 state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
             }
         } else {
-            // Fresh State
             state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
         }
     } catch (e) {
@@ -117,7 +114,7 @@ window.switchTab = function(tabId) {
         if (n.dataset.target === tabId) n.classList.add('active');
         else n.classList.remove('active');
     });
-    renderAll(); // Ensure data is fresh on tab switch
+    renderAll();
 };
 
 window.toggleTheme = function() {
@@ -499,7 +496,7 @@ function getSettlementData() {
     return { 
         personalSpend, 
         totalPaid, 
-        toReceiveTotal, // Pending overall
+        toReceiveTotal,
         collectedTotal, 
         peopleBalances 
     };
@@ -537,20 +534,20 @@ window.toggleExpenseExpand = function(expId) {
     renderSettlementsTab();
 };
 
-window.triggerGpayConfirm = function(expId) {
-    document.getElementById('gpay-confirm-exp-id').value = expId;
-    openModal('modal-gpay-confirm');
-};
-
-window.confirmGpayRequest = function() {
-    const expId = document.getElementById('gpay-confirm-exp-id').value;
+// FIX: Allow toggling Request Sent status back and forth
+window.toggleGpayRequest = function(expId) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp) {
-        exp.gpayRequestStatus = 'sent';
-        exp.gpayRequestSentAt = new Date().toISOString();
+        if (exp.gpayRequestStatus === 'sent') {
+            exp.gpayRequestStatus = 'not_sent';
+            exp.gpayRequestSentAt = null;
+            showToast("Request marked as Not Sent");
+        } else {
+            exp.gpayRequestStatus = 'sent';
+            exp.gpayRequestSentAt = new Date().toISOString();
+            showToast("Request marked as Sent");
+        }
         saveState();
-        closeAllModals();
-        showToast("Marked as sent");
     }
 };
 
@@ -580,8 +577,6 @@ function renderAll() {
 
 function renderHome() {
     const data = getSettlementData();
-    
-    // FIX: Budget should be based strictly on THIS MONTH's spending
     const currentMonth = new Date().toISOString().slice(0,7); 
     let monthPersonalSpend = 0;
     
@@ -597,8 +592,8 @@ function renderHome() {
     });
     
     document.getElementById('home-my-spend').innerText = formatINR(monthPersonalSpend);
-    document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid); // All time paid
-    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal); // All time pending
+    document.getElementById('home-total-paid').innerText = formatINR(data.totalPaid);
+    document.getElementById('home-to-receive').innerText = formatINR(data.toReceiveTotal); 
     
     if (state.budget > 0) {
         const left = state.budget - monthPersonalSpend;
@@ -617,6 +612,7 @@ function renderRecentExpenses() {
         recent.innerHTML = `<div class="empty-state text-sm p-md">No expenses yet.</div>`;
         return;
     }
+    // FIX: Reverse chron sort
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     recent.innerHTML = sorted.slice(0, 3).map(e => `
         <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
@@ -629,7 +625,6 @@ function renderRecentExpenses() {
     `).join('');
 }
 
-// FIX: Added Search and Month Filtering functionality
 window.renderExpensesListFull = function() {
     const list = document.getElementById('expenses-list');
     if (!list) return;
@@ -657,6 +652,7 @@ window.renderExpensesListFull = function() {
         return;
     }
     
+    // FIX: Reverse chron sort
     const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
     list.innerHTML = sorted.map(e => `
         <div class="card p-md flex-between align-center clickable" onclick="editExpense('${e.id}')">
@@ -746,6 +742,7 @@ function renderSettlementByExpense(container) {
         }
     });
     
+    // FIX: Sort Date Descending (most recent first)
     displayList.sort((a,b) => new Date(b.exp.date) - new Date(a.exp.date));
     
     if (displayList.length === 0) {
@@ -757,18 +754,11 @@ function renderSettlementByExpense(container) {
         const { exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled } = item;
         const isExpanded = !!expandedExpenses[exp.id];
         
+        // FIX: Removed Paid/Pending, just shows Name and Amount
         const participantsHtml = participantsData.map(p => `
             <div class="flex-between align-center py-sm border-bottom" style="padding-top: 8px; padding-bottom: 8px;">
-                <div>
-                    <div class="font-medium text-sm">${p.name}</div>
-                    <div class="text-primary font-bold">${formatINR(p.share)}</div>
-                </div>
-                <div>
-                    ${p.isSettled 
-                        ? `<button class="btn-action-small" onclick="toggleParticipantPaid('${exp.id}', '${p.id}')">✓ Paid</button>`
-                        : `<button class="btn-action-small" style="background:var(--bg-main);" onclick="toggleParticipantPaid('${exp.id}', '${p.id}')">● Pending</button>`
-                    }
-                </div>
+                <div class="font-medium text-sm">${p.name}</div>
+                <div class="text-primary font-bold">${formatINR(p.share)}</div>
             </div>
         `).join('');
         
@@ -800,7 +790,10 @@ function renderSettlementByExpense(container) {
                             : `<span class="text-sm font-medium text-warning">● Not Sent</span>`
                         }
                     </div>
-                    ${!gpaySent ? `<button class="btn-action-small" onclick="triggerGpayConfirm('${exp.id}')">Mark Request Sent</button>` : ''}
+                    <!-- FIX: Button now toggles state back and forth directly -->
+                    <button class="btn-action-small" onclick="toggleGpayRequest('${exp.id}')">
+                        ${gpaySent ? 'Mark Not Sent' : 'Mark Request Sent'}
+                    </button>
                 </div>
                 
                 <div class="flex-between align-center mt-md">
@@ -811,19 +804,8 @@ function renderSettlementByExpense(container) {
 
             ${isExpanded ? `
                 <div class="border-top p-md bg-secondary">
-                    <div class="text-xs font-bold text-secondary mb-xs">PAYMENT STATUS</div>
+                    <div class="text-xs font-bold text-secondary mb-xs">SPLIT BREAKDOWN</div>
                     ${participantsHtml}
-                    <div class="pt-sm mt-sm">
-                        <div class="flex-between text-sm mb-xs">
-                            <span class="text-secondary">Collected</span>
-                            <strong class="text-success">${formatINR(expCollected)}</strong>
-                        </div>
-                        <div class="flex-between text-sm">
-                            <span class="text-secondary">Pending</span>
-                            <strong class="${expPending > 0 ? 'text-danger' : 'text-secondary'}">${formatINR(expPending)}</strong>
-                        </div>
-                        ${isFullySettled ? `<div class="mt-md text-center text-success font-bold text-sm">✓ Fully Settled</div>` : ''}
-                    </div>
                 </div>
             ` : ''}
         </div>
@@ -866,7 +848,6 @@ function renderSettlementByPerson(container) {
     }).join('');
 }
 
-// FIX: Added previously missing Analytics render function
 function renderAnalytics() {
     const currentMonth = new Date().toISOString().slice(0,7); 
     let monthSpend = 0;
