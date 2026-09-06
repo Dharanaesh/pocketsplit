@@ -15,11 +15,15 @@ let state = {
     budget: 0
 };
 
+// Split Engine State
+let currentSplitType = 'equal';
+let splitDataState = []; // Holds {personId, name, selected, share}
+
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
     
-    // Set a default PIN for testing if none exists (Remove this in production if you want optional PINs)
+    // Set a default PIN for testing if none exists
     if (!localStorage.getItem(PIN_KEY)) {
         localStorage.setItem(PIN_KEY, '1234'); 
     }
@@ -62,7 +66,7 @@ window.logout = function() {
     closeAllModals();
 };
 
-// --- CORE FINANCIAL MATH (Bug Fixes) ---
+// --- CORE FINANCIAL MATH ---
 function roundToTwo(num) {
     return Math.round((Number(num) + Number.EPSILON) * 100) / 100;
 }
@@ -133,28 +137,168 @@ window.openExpenseModal = function() {
     const catSelect = document.getElementById('exp-category');
     catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
+    // Reset Split UI
+    document.getElementById('exp-is-split').checked = false;
+    document.getElementById('split-section').style.display = 'none';
+    currentSplitType = 'equal';
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.seg-btn[data-type="equal"]').classList.add('active');
+    
     document.getElementById('btn-delete-expense').style.display = 'none';
     openModal('modal-expense');
 };
 
-// --- EXPENSE LOGIC (Double Submission & Validation Fixes) ---
+// --- SPLIT ENGINE (The Bug Fix) ---
+window.toggleSplitUI = function() {
+    const isChecked = document.getElementById('exp-is-split').checked;
+    document.getElementById('split-section').style.display = isChecked ? 'block' : 'none';
+    
+    if (isChecked) {
+        // Initialize list
+        splitDataState = [{personId: 'you', name: 'You', selected: true, share: 0}];
+        state.people.forEach(p => {
+            splitDataState.push({personId: p.id, name: p.name, selected: true, share: 0});
+        });
+        renderSplitMembers();
+    }
+};
+
+window.setSplitType = function(type) {
+    currentSplitType = type;
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.seg-btn[data-type="${type}"]`).classList.add('active');
+    
+    // Reset shares when switching types
+    splitDataState.forEach(s => s.share = 0);
+    renderSplitMembers();
+};
+
+window.renderSplitMembers = function() {
+    const list = document.getElementById('split-members-list');
+    
+    if (splitDataState.length <= 1) {
+        list.innerHTML = `<p class="text-sm text-secondary">Please add people in the Settlements tab first.</p>`;
+        calculateSplits(); 
+        return;
+    }
+    
+    list.innerHTML = splitDataState.map((s, idx) => `
+        <div class="split-row flex-between align-center">
+            <label class="flex-row align-center gap-sm cursor-pointer mb-0">
+                <input type="checkbox" class="checkbox-custom" 
+                       onchange="togglePersonSplit(${idx}, this.checked)" 
+                       ${s.selected ? 'checked' : ''}>
+                <span class="font-medium">${s.name}</span>
+            </label>
+            <div class="flex-row align-center gap-xs">
+                ${currentSplitType === 'percent' ? '<span>%</span>' : (currentSplitType === 'custom' ? '<span class="text-secondary">₹</span>' : '')}
+                <input type="number" class="input-standard p-sm text-right" 
+                       style="width: 90px;"
+                       value="${s.share}" 
+                       ${currentSplitType === 'equal' || !s.selected ? 'disabled' : ''}
+                       oninput="updatePersonShare(${idx}, this.value)"
+                       min="0" step="any">
+            </div>
+        </div>
+    `).join('');
+    calculateSplits();
+};
+
+window.togglePersonSplit = function(idx, isChecked) {
+    splitDataState[idx].selected = isChecked;
+    if (!isChecked) splitDataState[idx].share = 0;
+    renderSplitMembers(); // Re-render to handle disabled states properly
+};
+
+window.updatePersonShare = function(idx, val) {
+    splitDataState[idx].share = parseFloat(val) || 0;
+    calculateSplits();
+};
+
+window.calculateSplits = function() {
+    const isSplit = document.getElementById('exp-is-split').checked;
+    if (!isSplit) return;
+    
+    const totalExp = roundToTwo(document.getElementById('exp-amount').value || 0);
+    const selected = splitDataState.filter(s => s.selected);
+    let calculatedTotal = 0;
+    
+    const valText = document.getElementById('split-validation-text');
+    const valTotal = document.getElementById('split-total-amount');
+
+    if (currentSplitType === 'equal') {
+        if (selected.length > 0) {
+            const splitAmount = roundToTwo(totalExp / selected.length);
+            splitDataState.forEach(s => {
+                s.share = s.selected ? splitAmount : 0;
+            });
+            // Update inputs without losing focus
+            document.querySelectorAll('.split-row input[type="number"]').forEach((input, idx) => {
+                if (splitDataState[idx].selected) input.value = splitAmount;
+            });
+            calculatedTotal = roundToTwo(splitAmount * selected.length);
+        }
+        valText.innerText = "Calculated Total:";
+        valTotal.innerText = formatINR(calculatedTotal);
+        // Allow a few pennies margin of error for division (e.g. 100/3)
+        valTotal.className = Math.abs(totalExp - calculatedTotal) < 0.1 ? 'text-success' : 'text-danger';
+        
+    } else if (currentSplitType === 'percent') {
+        calculatedTotal = selected.reduce((sum, s) => sum + s.share, 0);
+        valText.innerText = "Total Percentage:";
+        valTotal.innerText = `${roundToTwo(calculatedTotal)}%`;
+        valTotal.className = roundToTwo(calculatedTotal) === 100 ? 'text-success' : 'text-danger';
+        
+    } else if (currentSplitType === 'custom') {
+        calculatedTotal = selected.reduce((sum, s) => sum + s.share, 0);
+        valText.innerText = "Calculated Total:";
+        valTotal.innerText = formatINR(calculatedTotal);
+        valTotal.className = roundToTwo(calculatedTotal) === totalExp ? 'text-success' : 'text-danger';
+    }
+};
+
+function validateSplitData(amount, type, data) {
+    if (data.length === 0) throw new Error("Please select at least one person for the split.");
+    
+    if (type === 'percent') {
+        const total = roundToTwo(data.reduce((sum, d) => sum + d.share, 0));
+        if (total !== 100) throw new Error(`Percentages must equal 100% (Currently ${total}%).`);
+    } else if (type === 'custom') {
+        const total = roundToTwo(data.reduce((sum, d) => sum + d.share, 0));
+        if (total !== roundToTwo(amount)) throw new Error(`Custom shares must equal the total expense amount.`);
+    }
+}
+
+// --- EXPENSE LOGIC ---
 window.saveExpense = function(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true; // Prevent double submit
+    btn.disabled = true; 
     
     try {
         const id = document.getElementById('exp-id').value || 'exp_' + Date.now();
         const amount = roundToTwo(document.getElementById('exp-amount').value);
         const desc = document.getElementById('exp-desc').value.trim();
         const category = document.getElementById('exp-category').value;
-        const dateStr = document.getElementById('exp-date').value; // Local date safe
+        const dateStr = document.getElementById('exp-date').value; 
+        const isSplit = document.getElementById('exp-is-split').checked;
         
         if (amount <= 0) throw new Error("Amount must be greater than 0");
         
-        const expense = { id, amount, desc, category, date: dateStr };
+        let splitType = 'none';
+        let splitData = null;
+
+        if (isSplit) {
+            splitType = currentSplitType;
+            splitData = splitDataState.filter(s => s.selected).map(s => ({
+                personId: s.personId,
+                share: s.share
+            }));
+            validateSplitData(amount, splitType, splitData);
+        }
         
-        // Update or Insert
+        const expense = { id, amount, desc, category, date: dateStr, isSplit, splitType, splitData };
+        
         const existingIdx = state.expenses.findIndex(ex => ex.id === id);
         if (existingIdx >= 0) state.expenses[existingIdx] = expense;
         else state.expenses.push(expense);
@@ -169,6 +313,46 @@ window.saveExpense = function(e) {
     }
 };
 
+window.editExpense = function(id) {
+    const exp = state.expenses.find(e => e.id === id);
+    if (!exp) return;
+    
+    document.getElementById('exp-id').value = exp.id;
+    document.getElementById('exp-amount').value = exp.amount;
+    document.getElementById('exp-desc').value = exp.desc;
+    document.getElementById('exp-date').value = exp.date;
+    
+    const catSelect = document.getElementById('exp-category');
+    catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}" ${c.id === exp.category ? 'selected' : ''}>${c.name}</option>`).join('');
+    
+    // Load Split Data
+    const splitCheck = document.getElementById('exp-is-split');
+    splitCheck.checked = !!exp.isSplit;
+    document.getElementById('split-section').style.display = exp.isSplit ? 'block' : 'none';
+    
+    if (exp.isSplit) {
+        currentSplitType = exp.splitType || 'equal';
+        document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.seg-btn[data-type="${currentSplitType}"]`).classList.add('active');
+        
+        // Restore members
+        splitDataState = [{personId: 'you', name: 'You', selected: false, share: 0}];
+        state.people.forEach(p => splitDataState.push({personId: p.id, name: p.name, selected: false, share: 0}));
+        
+        exp.splitData.forEach(saved => {
+            const target = splitDataState.find(s => s.personId === saved.personId);
+            if (target) {
+                target.selected = true;
+                target.share = saved.share;
+            }
+        });
+        renderSplitMembers();
+    }
+    
+    document.getElementById('btn-delete-expense').style.display = 'block';
+    openModal('modal-expense');
+};
+
 window.deleteExpenseFromModal = function() {
     const id = document.getElementById('exp-id').value;
     state.expenses = state.expenses.filter(e => e.id !== id);
@@ -177,7 +361,7 @@ window.deleteExpenseFromModal = function() {
     showToast("Expense deleted");
 };
 
-// --- PEOPLE & SETTLEMENTS (Safe Deletion) ---
+// --- PEOPLE & SETTLEMENTS ---
 window.savePerson = function(e) {
     e.preventDefault();
     const name = document.getElementById('person-name').value.trim();
@@ -189,8 +373,7 @@ window.savePerson = function(e) {
 };
 
 window.deletePerson = function(id) {
-    // Audit Requirement: Prevent deletion if person is referenced in expenses
-    const inUse = state.expenses.some(e => e.paidBy === id || (e.splitData && e.splitData.some(s => s.personId === id)));
+    const inUse = state.expenses.some(e => e.isSplit && e.splitData && e.splitData.some(s => s.personId === id));
     if (inUse) {
         alert("Cannot delete this person. They are part of existing expenses. Please delete the expenses first.");
         return;
@@ -199,7 +382,7 @@ window.deletePerson = function(id) {
     saveState();
 };
 
-// --- CATEGORIES (Safe Deletion) ---
+// --- CATEGORIES ---
 window.addCategory = function(e) {
     e.preventDefault();
     const name = document.getElementById('new-cat-name').value.trim();
@@ -211,7 +394,6 @@ window.addCategory = function(e) {
 };
 
 window.deleteCategory = function(id) {
-    // Audit Requirement: Prevent deletion if category is in use
     const inUse = state.expenses.some(e => e.category === id);
     if (inUse) {
         alert("Cannot delete this category. It is used by existing expenses.");
@@ -234,7 +416,7 @@ window.removeBudget = function() {
     closeAllModals();
 };
 
-// --- IMPORT / EXPORT (Safe parsing) ---
+// --- IMPORT / EXPORT ---
 window.exportData = function() {
     const data = JSON.stringify(state);
     const blob = new Blob([data], { type: 'application/json' });
@@ -291,7 +473,6 @@ function renderHome() {
         document.getElementById('home-budget-left').innerText = 'Not Set';
     }
     
-    // Render Analytics basic
     document.getElementById('analytics-total').innerText = formatINR(totalSpend);
 }
 
@@ -311,6 +492,7 @@ function renderExpensesList() {
             <div>
                 <h3 class="m-0">${e.desc}</h3>
                 <span class="text-xs text-secondary">${e.date}</span>
+                ${e.isSplit ? '<span class="text-xs text-primary ml-sm">Split</span>' : ''}
             </div>
             <strong class="text-primary">${formatINR(e.amount)}</strong>
         </div>
@@ -319,27 +501,11 @@ function renderExpensesList() {
     list.innerHTML = html;
     recent.innerHTML = sorted.slice(0, 3).map(e => `
         <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
-            <span>${e.desc}</span>
+            <span>${e.desc} ${e.isSplit ? '🔄' : ''}</span>
             <strong class="text-primary">${formatINR(e.amount)}</strong>
         </div>
     `).join('');
 }
-
-window.editExpense = function(id) {
-    const exp = state.expenses.find(e => e.id === id);
-    if (!exp) return;
-    
-    document.getElementById('exp-id').value = exp.id;
-    document.getElementById('exp-amount').value = exp.amount;
-    document.getElementById('exp-desc').value = exp.desc;
-    document.getElementById('exp-date').value = exp.date;
-    
-    const catSelect = document.getElementById('exp-category');
-    catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}" ${c.id === exp.category ? 'selected' : ''}>${c.name}</option>`).join('');
-    
-    document.getElementById('btn-delete-expense').style.display = 'block';
-    openModal('modal-expense');
-};
 
 function renderCategoriesModal() {
     const list = document.getElementById('category-manage-list');
