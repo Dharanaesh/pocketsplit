@@ -36,6 +36,32 @@
     --space-xl: 32px;
 }
 
+/* Large Input for Access Code */
+.input-lg {
+    width: 100%;
+    padding: 16px 20px;
+    font-size: 1.5rem;          /* Much larger text */
+    letter-spacing: 0.1em;      /* Spaces out the password dots nicely */
+    background-color: var(--bg-surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+}
+
+.input-lg:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+.input-lg::placeholder {
+    font-size: 1.1rem;
+    letter-spacing: normal;
+    color: var(--text-muted);
+}
+
 [data-theme="dark"] {
     --bg-main: #0F1115;
     --bg-surface: #171A21;
