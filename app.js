@@ -74,6 +74,30 @@ function formatINR(amount) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 }
 
+// --- NEW TIME FORMATTING UTILITIES ---
+function formatTime(isoString) {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getRelativeDateLabel(dateString) {
+    const today = new Date();
+    const targetDate = new Date(dateString); // "YYYY-MM-DD"
+    
+    // Normalize to midnight for accurate comparison
+    const todayNum = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const targetNum = Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    
+    const diffDays = (todayNum - targetNum) / (1000 * 60 * 60 * 24);
+    
+    const formattedDate = targetDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    
+    if (diffDays === 0) return `TODAY · ${formattedDate}`;
+    if (diffDays === 1) return `YESTERDAY · ${formattedDate}`;
+    return formattedDate;
+}
+
+
 // --- STATE MANAGEMENT ---
 function loadState() {
     try {
@@ -81,12 +105,16 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
+            // Ensure expenses array is clean and backwards compatible
             state.expenses = state.expenses.map(e => ({
                 ...e,
                 amount: Number(e.amount),
                 gpayRequestStatus: e.gpayRequestStatus || 'not_sent',
                 gpayRequestSentAt: e.gpayRequestSentAt || null,
-                splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null
+                splitData: e.splitData ? e.splitData.map(s => ({...s, share: Number(s.share)})) : null,
+                // Add timestamps to legacy data
+                createdAt: e.createdAt || new Date().toISOString(),
+                updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
             if (!state.categories || state.categories.length === 0) {
                 state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
@@ -286,12 +314,15 @@ window.saveExpense = function(e) {
         const category = document.getElementById('exp-category').value;
         const dateStr = document.getElementById('exp-date').value; 
         const isSplit = document.getElementById('exp-is-split').checked;
+        const currentIsoTime = new Date().toISOString();
         
         if (amount <= 0) throw new Error("Amount must be greater than 0");
         
         const existingExp = state.expenses.find(ex => ex.id === id);
         let gpayRequestStatus = existingExp ? existingExp.gpayRequestStatus : 'not_sent';
         let gpayRequestSentAt = existingExp ? existingExp.gpayRequestSentAt : null;
+        let createdAt = existingExp ? existingExp.createdAt : currentIsoTime;
+        let updatedAt = currentIsoTime;
 
         let splitType = 'none';
         let splitData = null;
@@ -315,7 +346,10 @@ window.saveExpense = function(e) {
             validateSplitData(amount, splitType, splitDataState.filter(s=>s.selected));
         }
         
-        const expense = { id, amount, desc, category, date: dateStr, isSplit, splitType, splitData, gpayRequestStatus, gpayRequestSentAt };
+        const expense = { 
+            id, amount, desc, category, date: dateStr, isSplit, splitType, splitData, 
+            gpayRequestStatus, gpayRequestSentAt, createdAt, updatedAt 
+        };
         
         if (existingExp) {
             const idx = state.expenses.findIndex(ex => ex.id === id);
@@ -534,7 +568,6 @@ window.toggleExpenseExpand = function(expId) {
     renderSettlementsTab();
 };
 
-// FIX: Allow toggling Request Sent status back and forth
 window.toggleGpayRequest = function(expId) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp) {
@@ -612,8 +645,12 @@ function renderRecentExpenses() {
         recent.innerHTML = `<div class="empty-state text-sm p-md">No expenses yet.</div>`;
         return;
     }
-    // FIX: Reverse chron sort
-    const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const sorted = [...state.expenses].sort((a,b) => {
+        const timeA = new Date(a.updatedAt || a.createdAt).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt).getTime();
+        return timeB - timeA;
+    });
+    
     recent.innerHTML = sorted.slice(0, 3).map(e => `
         <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
             <div class="expense-list-item-left">
@@ -652,18 +689,55 @@ window.renderExpensesListFull = function() {
         return;
     }
     
-    // FIX: Reverse chron sort
-    const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
-    list.innerHTML = sorted.map(e => `
-        <div class="card p-md flex-between align-center clickable" onclick="editExpense('${e.id}')">
-            <div class="expense-list-item-left">
-                <h3 class="m-0">${e.desc}</h3>
-                <span class="text-xs text-secondary">${e.date}</span>
-                ${e.isSplit ? '<span class="text-xs text-primary ml-sm">Split</span>' : ''}
+    // Grouping Logic
+    const grouped = {};
+    filtered.forEach(exp => {
+        if (!grouped[exp.date]) {
+            grouped[exp.date] = [];
+        }
+        grouped[exp.date].push(exp);
+    });
+    
+    // Sort Date Groups Descending
+    const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+    
+    let html = '';
+    
+    sortedDates.forEach(dateStr => {
+        // Sort items inside the group by exact time (updatedAt/createdAt) descending
+        const items = grouped[dateStr].sort((a,b) => {
+            const timeA = new Date(a.updatedAt || a.createdAt).getTime();
+            const timeB = new Date(b.updatedAt || b.createdAt).getTime();
+            return timeB - timeA;
+        });
+        
+        const dateHeader = getRelativeDateLabel(dateStr);
+        
+        html += `
+            <div class="mt-md mb-xs">
+                <span class="text-xs font-bold text-secondary tracking-wide">${dateHeader.toUpperCase()}</span>
+                <div class="border-bottom mt-xs mb-sm"></div>
             </div>
-            <strong class="text-primary">${formatINR(e.amount)}</strong>
-        </div>
-    `).join('');
+        `;
+        
+        html += items.map(e => {
+            const timeStr = formatTime(e.updatedAt || e.createdAt);
+            
+            return `
+            <div class="card p-md flex-between align-center mb-sm clickable" onclick="editExpense('${e.id}')">
+                <div class="expense-list-item-left">
+                    <h3 class="m-0">${e.desc}</h3>
+                    <div class="text-xs text-secondary mt-xs">
+                        ${timeStr}
+                        ${e.isSplit ? '<span class="text-primary font-medium ml-sm">Split</span>' : ''}
+                    </div>
+                </div>
+                <strong class="text-primary">${formatINR(e.amount)}</strong>
+            </div>
+        `}).join('');
+    });
+    
+    list.innerHTML = html;
 }
 
 function renderCategoriesModal() {
@@ -742,7 +816,6 @@ function renderSettlementByExpense(container) {
         }
     });
     
-    // FIX: Sort Date Descending (most recent first)
     displayList.sort((a,b) => new Date(b.exp.date) - new Date(a.exp.date));
     
     if (displayList.length === 0) {
@@ -754,7 +827,6 @@ function renderSettlementByExpense(container) {
         const { exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled } = item;
         const isExpanded = !!expandedExpenses[exp.id];
         
-        // FIX: Removed Paid/Pending, just shows Name and Amount
         const participantsHtml = participantsData.map(p => `
             <div class="flex-between align-center py-sm border-bottom" style="padding-top: 8px; padding-bottom: 8px;">
                 <div class="font-medium text-sm">${p.name}</div>
@@ -790,7 +862,6 @@ function renderSettlementByExpense(container) {
                             : `<span class="text-sm font-medium text-warning">● Not Sent</span>`
                         }
                     </div>
-                    <!-- FIX: Button now toggles state back and forth directly -->
                     <button class="btn-action-small" onclick="toggleGpayRequest('${exp.id}')">
                         ${gpaySent ? 'Mark Not Sent' : 'Mark Request Sent'}
                     </button>
