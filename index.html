@@ -53,7 +53,7 @@
                 <div class="sidebar-divider"></div>
                 
                 <button class="nav-item" onclick="switchTab('settings')" data-target="settings">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Settings
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Settings
                 </button>
             </nav>
         </aside>
@@ -74,26 +74,27 @@
                     </div>
                     <div class="flex-row gap-sm">
                         <button class="btn btn-secondary" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
-                        <button class="btn btn-primary" onclick="openExpenseModal()">+ Add Expense</button>
+                        <!-- ADDED QUICK ADD SHORTCUT -->
+                        <button class="btn btn-primary" onclick="triggerQuickAdd()">+ Quick Add</button>
                     </div>
                 </div>
 
                 <div class="grid-2 gap-md mb-lg">
                     <div class="card summary-card">
                         <span class="text-secondary text-sm">My Spending</span>
-                        <h2 id="home-my-spend" class="mt-xs">₹0</h2>
+                        <h2 id="home-my-spend" class="mt-xs">₹0.00</h2>
                     </div>
                     <div class="card summary-card">
                         <span class="text-secondary text-sm">Total Paid</span>
-                        <h2 id="home-total-paid" class="mt-xs">₹0</h2>
+                        <h2 id="home-total-paid" class="mt-xs">₹0.00</h2>
                     </div>
                     <div class="card summary-card">
                         <span class="text-secondary text-sm">To Receive</span>
-                        <h2 id="home-to-receive" class="mt-xs text-success">₹0</h2>
+                        <h2 id="home-to-receive" class="mt-xs text-success">₹0.00</h2>
                     </div>
                     <div class="card summary-card">
                         <span class="text-secondary text-sm">Budget Left</span>
-                        <h2 id="home-budget-left" class="mt-xs text-primary">₹0</h2>
+                        <h2 id="home-budget-left" class="mt-xs text-primary">₹0.00</h2>
                     </div>
                 </div>
 
@@ -106,7 +107,11 @@
 
             <!-- 2. EXPENSES VIEW -->
             <section id="view-expenses" class="view">
-                <h1 class="page-title mb-md mobile-only">Expenses</h1>
+                <div class="flex-between align-center mb-md">
+                    <h1 class="page-title mobile-only">Expenses</h1>
+                    <button class="btn-ghost text-primary text-sm font-medium mobile-only" onclick="exportCSV()">Export CSV</button>
+                </div>
+                
                 <div class="filter-bar mb-md">
                     <div class="search-input-wrapper flex-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -117,7 +122,7 @@
                 <div id="expenses-list" class="flex-col gap-sm pb-xl"></div>
             </section>
 
-            <!-- 3. SETTLEMENTS VIEW (REDESIGNED) -->
+            <!-- 3. SETTLEMENTS VIEW -->
             <section id="view-settlements" class="view">
                 <div class="flex-between align-center mb-md">
                     <h1 class="page-title mobile-only">Settlements</h1>
@@ -125,13 +130,11 @@
                     <button class="btn btn-secondary btn-sm ml-auto" onclick="openModal('modal-person')">+ Add Person</button>
                 </div>
                 
-                <!-- View Toggle -->
                 <div class="segmented-control mb-md">
                     <button type="button" class="seg-btn active" id="btn-view-expense" onclick="setSettlementView('expense')">By Expense</button>
                     <button type="button" class="seg-btn" id="btn-view-person" onclick="setSettlementView('person')">By Person</button>
                 </div>
 
-                <!-- Top Summary (Expense View Default) -->
                 <div id="settlements-top-summary" class="grid-3 gap-sm mb-md text-center">
                     <div class="card p-sm">
                         <div class="text-xs text-secondary">To Receive</div>
@@ -147,7 +150,6 @@
                     </div>
                 </div>
 
-                <!-- Filters -->
                 <div id="settlement-filters" class="filter-scroll mb-md">
                     <button class="filter-chip active" data-filter="all" onclick="setSettlementFilter('all')">All</button>
                     <button class="filter-chip" data-filter="need_request" onclick="setSettlementFilter('need_request')">Need Request</button>
@@ -156,7 +158,6 @@
                     <button class="filter-chip" data-filter="settled" onclick="setSettlementFilter('settled')">Settled</button>
                 </div>
 
-                <!-- Main List Area -->
                 <div id="settlements-list-container" class="flex-col gap-md pb-xl"></div>
             </section>
 
@@ -194,10 +195,13 @@
                 </div>
 
                 <div class="card p-0 mb-md overflow-hidden">
-                    <div class="list-item clickable" onclick="exportData()">
-                        <span>Export Backup (.json)</span>
+                    <div class="list-item clickable" onclick="exportCSV()">
+                        <span>Export CSV (.csv)</span>
                     </div>
-                    <label class="list-item clickable m-0 border-0">
+                    <div class="list-item clickable border-top" onclick="exportData()">
+                        <span>Export Full Backup (.json)</span>
+                    </div>
+                    <label class="list-item clickable m-0 border-top">
                         <span>Import Backup</span>
                         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
                     </label>
@@ -207,12 +211,12 @@
                     <div class="list-item clickable text-danger" onclick="clearAllData()">
                         <span>Clear All Data</span>
                     </div>
-                    <div class="list-item clickable text-danger border-0" onclick="logout()">
+                    <div class="list-item clickable text-danger border-top" onclick="logout()">
                         <span>Lock App</span>
                     </div>
                 </div>
                 
-                <p class="text-center text-muted text-sm">PocketSplit v1.2.1</p>
+                <p class="text-center text-muted text-sm">PocketSplit v1.4.0</p>
             </section>
         </main>
 
@@ -221,8 +225,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
 
-        <!-- Bottom Navigation (Mobile) -->
+        <!-- Bottom Navigation -->
         <nav id="bottom-nav" class="mobile-only">
+            <!-- (Nav Buttons Omitted for Brevity but retained structurally) -->
             <button class="nav-item active" onclick="switchTab('home')" data-target="home">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
                 <span>Home</span>
@@ -240,7 +245,7 @@
                 <span>Analytics</span>
             </button>
             <button class="nav-item" onclick="switchTab('settings')" data-target="settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 <span>More</span>
             </button>
         </nav>
@@ -263,13 +268,19 @@
                     <label>Amount</label>
                     <div class="amount-input-wrapper">
                         <span class="currency-symbol">₹</span>
-                        <input type="number" id="exp-amount" class="input-massive" placeholder="0" step="1" required oninput="calculateSplits()">
+                        <input type="number" id="exp-amount" class="input-massive" placeholder="0.00" step="0.01" min="0.01" required oninput="calculateSplits()">
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label>Description</label>
                     <input type="text" id="exp-desc" class="input-standard" placeholder="e.g. Cinema" required>
+                </div>
+                
+                <!-- NEW NOTES FIELD -->
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <textarea id="exp-notes" class="input-standard" placeholder="Additional details..." rows="2" style="resize:vertical;"></textarea>
                 </div>
                 
                 <div class="grid-2 gap-sm">
@@ -304,7 +315,7 @@
                     
                     <div class="split-summary mt-md pt-md border-top flex-between">
                         <span class="text-sm text-secondary" id="split-validation-text">Calculated Total:</span>
-                        <strong class="text-primary" id="split-total-amount">₹0</strong>
+                        <strong class="text-primary" id="split-total-amount">₹0.00</strong>
                     </div>
                 </div>
 
@@ -314,6 +325,21 @@
                     <button type="submit" class="btn btn-primary flex-2">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Confirm Split Edit Warning Modal -->
+    <div class="modal center-modal" id="modal-split-warning">
+        <div class="modal-header">
+            <h3>Warning</h3>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body text-center">
+            <p class="mb-lg text-sm">This expense already has payments recorded. Changing the amount or split may affect existing settlement data. Continue?</p>
+            <div class="flex-row gap-sm">
+                <button class="btn btn-secondary flex-1" onclick="closeAllModals()">Cancel</button>
+                <button class="btn btn-primary flex-1" onclick="forceSaveExpense()">Continue</button>
+            </div>
         </div>
     </div>
 
@@ -377,7 +403,8 @@
             <form onsubmit="saveBudget(event)">
                 <div class="form-group">
                     <label>Total Budget (₹)</label>
-                    <input type="number" id="budget-amount" class="input-standard" required min="0">
+                    <!-- FIX: Allowed Decimal Steps -->
+                    <input type="number" id="budget-amount" class="input-standard" required min="0.01" step="0.01">
                 </div>
                 <button type="submit" class="btn btn-primary w-100 mt-md">Save Budget</button>
                 <button type="button" class="btn btn-ghost text-danger w-100 mt-sm" onclick="removeBudget()">Remove Budget</button>
