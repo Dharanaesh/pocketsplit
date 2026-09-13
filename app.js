@@ -2,7 +2,6 @@
  * PocketSplit - Core Logic
  */
 
-// --- 1. STRICT IN-MEMORY AUTHENTICATION ---
 window.POCKETSPLIT_AUTH = { isUnlocked: false };
 const STORAGE_KEY = 'pocketsplit_data';
 const PIN_KEY = 'pocketSplit_accessCode';
@@ -17,14 +16,11 @@ let state = {
 let currentSplitType = 'equal';
 let splitDataState = []; 
 
-// Settlement UI State
 let settlementView = 'expense'; 
 let settlementFilter = 'all'; 
 let expandedExpenses = {}; 
+let pendingSavePayload = null; 
 
-let pendingSavePayload = null; // Used for the split edit warning modal
-
-// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
     if (!localStorage.getItem(PIN_KEY)) localStorage.setItem(PIN_KEY, '1234'); 
@@ -38,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- AUTH LOGIC ---
 window.handleLogin = function(e) {
     e.preventDefault();
     const enteredCode = document.getElementById('access-code').value;
@@ -67,7 +62,10 @@ window.logout = function() {
     closeAllModals();
 };
 
-// --- CORE FINANCIAL MATH (PAISE BASE) ---
+function roundToTwo(num) {
+    return Math.round((Number(num) + Number.EPSILON) * 100) / 100;
+}
+
 function toPaise(rupees) {
     return Math.round((parseFloat(rupees) + Number.EPSILON) * 100) || 0;
 }
@@ -80,7 +78,6 @@ function formatINR(rupees) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(rupees);
 }
 
-// --- NEW TIME FORMATTING UTILITIES ---
 function formatTime(isoString) {
     const d = new Date(isoString);
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -101,7 +98,6 @@ function getRelativeDateLabel(dateString) {
     return formattedDate;
 }
 
-// --- STATE MANAGEMENT ---
 function loadState() {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -113,7 +109,9 @@ function loadState() {
                 amount: parseFloat(e.amount) || 0, 
                 gpayRequestStatus: e.gpayRequestStatus || 'not_sent',
                 gpayRequestSentAt: e.gpayRequestSentAt || null,
-                notes: e.notes || '', // Migration for missing notes
+                paidBy: e.paidBy || 'you', 
+                notes: e.notes || '', 
+                tags: e.tags || '', // Multi-tag string migration
                 splitData: e.splitData ? e.splitData.map(s => ({...s, share: parseFloat(s.share) || 0})) : null,
                 createdAt: e.createdAt || new Date().toISOString(),
                 updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
@@ -125,7 +123,6 @@ function loadState() {
             state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
         }
     } catch (e) {
-        console.error("Corrupted local storage. Starting fresh.");
         state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
     }
 }
@@ -135,7 +132,6 @@ function saveState() {
     renderAll();
 }
 
-// --- UI & NAVIGATION ---
 window.switchTab = function(tabId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(`view-${tabId}`).classList.add('active');
@@ -152,7 +148,6 @@ window.toggleTheme = function() {
     document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
 };
 
-// --- MODALS ---
 window.openModal = function(id) {
     document.getElementById('overlay').style.display = 'block';
     setTimeout(() => {
@@ -176,6 +171,7 @@ window.openExpenseModal = function() {
     document.getElementById('exp-amount').value = '';
     document.getElementById('exp-desc').value = '';
     document.getElementById('exp-notes').value = '';
+    document.getElementById('exp-tags').value = '';
     
     const localDate = new Date();
     const localString = new Date(localDate.getTime() - (localDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
@@ -183,6 +179,10 @@ window.openExpenseModal = function() {
     
     const catSelect = document.getElementById('exp-category');
     catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    
+    const payerSelect = document.getElementById('exp-paid-by');
+    payerSelect.innerHTML = `<option value="you">You</option>` + state.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    payerSelect.value = 'you';
     
     document.getElementById('exp-is-split').checked = false;
     document.getElementById('split-section').style.display = 'none';
@@ -194,7 +194,6 @@ window.openExpenseModal = function() {
     openModal('modal-expense');
 };
 
-// --- SPLIT ENGINE (FIXED ROUNDING BUG) ---
 window.toggleSplitUI = function() {
     const isChecked = document.getElementById('exp-is-split').checked;
     document.getElementById('split-section').style.display = isChecked ? 'block' : 'none';
@@ -273,7 +272,6 @@ window.calculateSplits = function() {
         if (selected.length > 0) {
             const baseSplitPaise = Math.floor(totalPaise / selected.length);
             let remainderPaise = totalPaise % selected.length;
-            
             let currentSelectionIdx = 0;
             
             splitDataState.forEach((s) => { 
@@ -321,7 +319,7 @@ function validateSplitData(amount, type, data) {
     
     if (type === 'percent') {
         const totalPctPaise = data.reduce((sum, d) => sum + toPaise(d.rawValue), 0);
-        if (totalPctPaise !== 10000) throw new Error(`Percentages must exactly equal 100% (Currently ${toRupees(totalPctPaise)}%).`);
+        if (totalPctPaise !== 10000) throw new Error(`Percentages must exactly equal 100%.`);
         
         const totalSharePaise = data.reduce((sum, d) => sum + toPaise(d.share), 0);
         if (totalSharePaise !== targetPaise) {
@@ -341,12 +339,14 @@ window.saveExpense = function(e) {
     
     try {
         const id = document.getElementById('exp-id').value || 'exp_' + Date.now();
-        const amount = toRupees(toPaise(document.getElementById('exp-amount').value));
+        const amount = roundToTwo(parseFloat(document.getElementById('exp-amount').value));
         const desc = document.getElementById('exp-desc').value.trim();
         const notes = document.getElementById('exp-notes').value.trim();
+        const tags = document.getElementById('exp-tags').value.trim();
         const category = document.getElementById('exp-category').value;
+        const paidBy = document.getElementById('exp-paid-by').value;
         const dateStr = document.getElementById('exp-date').value; 
-        const isSplit = document.getElementById('exp-is-split').checked;
+        let isSplit = document.getElementById('exp-is-split').checked;
         const currentIsoTime = new Date().toISOString();
         
         if (isNaN(amount) || amount <= 0) throw new Error("Amount must be a valid number greater than 0");
@@ -360,7 +360,14 @@ window.saveExpense = function(e) {
         let splitType = 'none';
         let splitData = null;
 
-        if (isSplit) {
+        if (!isSplit && paidBy !== 'you') {
+            isSplit = true;
+            splitType = 'custom';
+            splitData = [
+                { personId: 'you', share: amount, rawValue: amount, isSettled: false },
+                { personId: paidBy, share: 0, rawValue: 0, isSettled: true }
+            ];
+        } else if (isSplit) {
             splitType = currentSplitType;
             const targetPaise = toPaise(amount);
             
@@ -396,39 +403,36 @@ window.saveExpense = function(e) {
             splitData = processingArray;
             validateSplitData(amount, splitType, splitData);
             
-            // --- EDIT PROTECTION LOGIC ---
             if (existingExp && existingExp.isSplit && existingExp.splitData) {
                 let hasPayments = existingExp.splitData.some(s => s.isSettled && s.personId !== 'you');
                 if (hasPayments) {
-                    // Check if any new share is less than what was already paid (which is illogical)
                     let invalidPayment = false;
                     splitData.forEach(newS => {
                         const oldS = existingExp.splitData.find(os => os.personId === newS.personId);
                         if (oldS && oldS.isSettled) {
-                            if (newS.share < oldS.share) { // Strictly speaking, if they paid X, the new share can't be less than X
+                            if (newS.share < oldS.share) { 
                                 invalidPayment = true;
                             }
                         }
                     });
 
                     pendingSavePayload = { 
-                        id, amount, desc, notes, category, date: dateStr, isSplit, splitType, splitData, 
+                        id, amount, desc, notes, tags, category, paidBy, date: dateStr, isSplit, splitType, splitData, 
                         gpayRequestStatus, gpayRequestSentAt, createdAt, updatedAt 
                     };
 
                     if (invalidPayment) {
-                        throw new Error("You cannot lower a person's share below what they have already paid. Please unmark their payment first.");
+                        throw new Error("Cannot lower a person's share below what they have already paid. Unmark their payment first.");
                     } else {
-                        // Warn user about editing a settled expense
                         openModal('modal-split-warning');
-                        return; // Halt execution until confirmed
+                        return; 
                     }
                 }
             }
         }
         
         executeExpenseSave({ 
-            id, amount, desc, notes, category, date: dateStr, isSplit, splitType, splitData, 
+            id, amount, desc, notes, tags, category, paidBy, date: dateStr, isSplit, splitType, splitData, 
             gpayRequestStatus, gpayRequestSentAt, createdAt, updatedAt 
         });
 
@@ -466,31 +470,42 @@ window.editExpense = function(id) {
     document.getElementById('exp-amount').value = exp.amount;
     document.getElementById('exp-desc').value = exp.desc;
     document.getElementById('exp-notes').value = exp.notes || '';
+    document.getElementById('exp-tags').value = exp.tags || '';
     document.getElementById('exp-date').value = exp.date;
     
     const catSelect = document.getElementById('exp-category');
     catSelect.innerHTML = state.categories.map(c => `<option value="${c.id}" ${c.id === exp.category ? 'selected' : ''}>${c.name}</option>`).join('');
     
-    const splitCheck = document.getElementById('exp-is-split');
-    splitCheck.checked = !!exp.isSplit;
-    document.getElementById('split-section').style.display = exp.isSplit ? 'block' : 'none';
+    const payerSelect = document.getElementById('exp-paid-by');
+    payerSelect.innerHTML = `<option value="you">You</option>` + state.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    payerSelect.value = exp.paidBy || 'you';
     
-    if (exp.isSplit) {
-        currentSplitType = exp.splitType || 'equal';
-        document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`.seg-btn[data-type="${currentSplitType}"]`).classList.add('active');
+    const splitCheck = document.getElementById('exp-is-split');
+    
+    if (exp.isSplit && exp.splitType === 'custom' && exp.paidBy !== 'you' && exp.splitData.length === 2 && exp.splitData[0].personId === 'you' && exp.splitData[0].share === exp.amount) {
+        splitCheck.checked = false;
+        document.getElementById('split-section').style.display = 'none';
+    } else {
+        splitCheck.checked = !!exp.isSplit;
+        document.getElementById('split-section').style.display = exp.isSplit ? 'block' : 'none';
         
-        splitDataState = [{personId: 'you', name: 'You', selected: false, share: 0}];
-        state.people.forEach(p => splitDataState.push({personId: p.id, name: p.name, selected: false, share: 0}));
-        
-        exp.splitData.forEach(saved => {
-            const target = splitDataState.find(s => s.personId === saved.personId);
-            if (target) {
-                target.selected = true;
-                target.share = exp.splitType === 'percent' && saved.rawValue ? saved.rawValue : saved.share;
-            }
-        });
-        renderSplitMembers();
+        if (exp.isSplit) {
+            currentSplitType = exp.splitType || 'equal';
+            document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.seg-btn[data-type="${currentSplitType}"]`).classList.add('active');
+            
+            splitDataState = [{personId: 'you', name: 'You', selected: false, share: 0}];
+            state.people.forEach(p => splitDataState.push({personId: p.id, name: p.name, selected: false, share: 0}));
+            
+            exp.splitData.forEach(saved => {
+                const target = splitDataState.find(s => s.personId === saved.personId);
+                if (target) {
+                    target.selected = true;
+                    target.share = exp.splitType === 'percent' && saved.rawValue ? saved.rawValue : saved.share;
+                }
+            });
+            renderSplitMembers();
+        }
     }
     
     document.getElementById('btn-delete-expense').style.display = 'block';
@@ -520,8 +535,6 @@ window.triggerQuickAdd = function() {
     }
     
     const currentIsoTime = new Date().toISOString();
-    
-    // Create Date safely using local timezone offset
     const localDate = new Date();
     const localString = new Date(localDate.getTime() - (localDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
@@ -530,7 +543,9 @@ window.triggerQuickAdd = function() {
         amount: parsedAmount, 
         desc: desc.trim(), 
         notes: '',
-        category: state.categories[0].id, // Default to first category
+        tags: '',
+        paidBy: 'you',
+        category: state.categories[0].id, 
         date: localString, 
         isSplit: false, 
         splitType: 'none', 
@@ -558,7 +573,7 @@ window.savePerson = function(e) {
 };
 
 window.deletePerson = function(id) {
-    const inUse = state.expenses.some(e => e.isSplit && e.splitData && e.splitData.some(s => s.personId === id));
+    const inUse = state.expenses.some(e => e.paidBy === id || (e.isSplit && e.splitData && e.splitData.some(s => s.personId === id)));
     if (inUse) {
         alert("Cannot delete this person. They are part of existing expenses.");
         return;
@@ -589,13 +604,12 @@ window.deleteCategory = function(id) {
 
 window.saveBudget = function(e) { 
     e.preventDefault(); 
-    state.budget = toRupees(toPaise(document.getElementById('budget-amount').value)); 
+    state.budget = roundToTwo(parseFloat(document.getElementById('budget-amount').value) || 0); 
     saveState(); 
     closeAllModals(); 
 };
 window.removeBudget = function() { state.budget = 0; saveState(); closeAllModals(); };
 window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorage.removeItem(STORAGE_KEY); window.location.reload(); } };
-
 
 // --- IMPORT / EXPORT / CSV ---
 window.exportCSV = function() {
@@ -604,20 +618,22 @@ window.exportCSV = function() {
         return;
     }
 
-    let csvContent = "Date,Time,Description,Category,Amount,Split Type,Participants,Notes,Created At,Updated At\n";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
 
     sorted.forEach(e => {
         const dateStr = e.date;
         const timeStr = formatTime(e.updatedAt || e.createdAt);
-        
-        // Escape quotes and commas
         const cleanDesc = `"${e.desc.replace(/"/g, '""')}"`;
         const cleanNotes = `"${(e.notes || '').replace(/"/g, '""')}"`;
+        const cleanTags = `"${(e.tags || '').replace(/"/g, '""')}"`;
         
         const catObj = state.categories.find(c => c.id === e.category);
         const catName = catObj ? catObj.name : 'Unknown';
         
+        const payerObj = e.paidBy === 'you' ? {name:'You'} : state.people.find(p => p.id === e.paidBy);
+        const payerName = payerObj ? payerObj.name : 'Unknown';
+
         const amountStr = e.amount.toFixed(2);
         
         let splitTypeStr = e.isSplit ? e.splitType : 'None';
@@ -635,7 +651,7 @@ window.exportCSV = function() {
         const cAt = new Date(e.createdAt).toLocaleString('en-US');
         const uAt = new Date(e.updatedAt).toLocaleString('en-US');
 
-        csvContent += `${dateStr},${timeStr},${cleanDesc},${catName},${amountStr},${splitTypeStr},${participantsStr},${cleanNotes},"${cAt}","${uAt}"\n`;
+        csvContent += `${dateStr},${timeStr},${cleanDesc},${catName},${payerName},${amountStr},${splitTypeStr},${participantsStr},${cleanTags},${cleanNotes},"${cAt}","${uAt}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -656,113 +672,64 @@ window.exportData = function() {
     a.click();
 };
 
-// --- IMPORT VALIDATION UTILITIES ---
-function validateImportedState(parsed) {
-    if (!parsed || typeof parsed !== 'object') throw new Error("File is not a valid JSON object.");
-    
-    // Validate Expenses
-    if (parsed.expenses && !Array.isArray(parsed.expenses)) throw new Error("'expenses' must be an array.");
-    if (parsed.expenses) {
-        parsed.expenses.forEach((e, idx) => {
-            if (!e.id) throw new Error(`Expense at index ${idx} is missing an ID.`);
-            if (typeof e.amount !== 'number' || isNaN(e.amount) || !isFinite(e.amount) || e.amount < 0) throw new Error(`Expense '${e.desc || e.id}' has an invalid amount.`);
-            if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) throw new Error(`Expense '${e.desc || e.id}' has an invalid date format.`);
-            
-            if (e.isSplit && e.splitData) {
-                if (!Array.isArray(e.splitData)) throw new Error(`Expense '${e.desc || e.id}' has malformed split data.`);
-                const shareTotal = e.splitData.reduce((sum, s) => sum + (Number(s.share) || 0), 0);
-                if (Math.abs(shareTotal - e.amount) > 0.05) { 
-                    throw new Error(`Expense '${e.desc}' split shares (₹${shareTotal}) do not match the total amount (₹${e.amount}).`);
-                }
-            }
-        });
-    }
-
-    // Validate Categories
-    if (parsed.categories && !Array.isArray(parsed.categories)) throw new Error("'categories' must be an array.");
-    if (parsed.categories) {
-        parsed.categories.forEach((c, idx) => {
-            if (!c.id || !c.name) throw new Error(`Category at index ${idx} is missing required fields.`);
-        });
-    }
-
-    // Validate People
-    if (parsed.people && !Array.isArray(parsed.people)) throw new Error("'people' must be an array.");
-    if (parsed.people) {
-        parsed.people.forEach((p, idx) => {
-            if (!p.id || !p.name) throw new Error(`Person at index ${idx} is missing required fields.`);
-        });
-    }
-}
-
-window.importData = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const parsed = JSON.parse(e.target.result);
-            validateImportedState(parsed);
-            
-            state = {
-                expenses: parsed.expenses || [],
-                people: parsed.people || [],
-                categories: parsed.categories || [],
-                budget: parsed.budget || 0
-            };
-            saveState();
-            alert("Backup imported successfully!");
-            window.location.reload();
-        } catch (err) {
-            alert(`Import failed:\n${err.message}\n\nYour existing data has NOT been changed.`);
-        }
-    };
-    reader.readAsText(file);
-};
-
-
 // --- AGGREGATION ENGINE ---
-function getSettlementData() {
+function getSettlementData(tagFilter = '') {
     let toReceiveTotal = 0;
+    let toPayTotal = 0;
     let collectedTotal = 0;
     let personalSpend = 0;
-    let totalPaid = 0;
+    let totalPaidByMe = 0;
     
     let peopleBalances = {}; 
     state.people.forEach(p => {
-        peopleBalances[p.id] = { name: p.name, owes: 0, paid: 0 };
+        peopleBalances[p.id] = { name: p.name, owesMe: 0, iOwe: 0, paid: 0 };
     });
 
     state.expenses.forEach(exp => {
-        if (!exp.isSplit) {
-            personalSpend += exp.amount;
-            totalPaid += exp.amount;
-        } else {
-            totalPaid += exp.amount; 
-            
-            const myShareObj = exp.splitData.find(s => s.personId === 'you');
-            if (myShareObj) {
-                personalSpend += myShareObj.share;
-            }
+        if (tagFilter && !(exp.tags || '').toLowerCase().includes(tagFilter)) return;
 
-            exp.splitData.forEach(s => {
-                if (s.personId !== 'you' && peopleBalances[s.personId]) {
-                    if (s.isSettled) {
-                        peopleBalances[s.personId].paid += s.share;
-                        collectedTotal += s.share;
-                    } else {
-                        peopleBalances[s.personId].owes += s.share;
-                        toReceiveTotal += s.share;
+        const paidBy = exp.paidBy || 'you';
+
+        if (!exp.isSplit) {
+            if (paidBy === 'you') {
+                personalSpend += exp.amount;
+                totalPaidByMe += exp.amount;
+            }
+        } else {
+            if (paidBy === 'you') {
+                totalPaidByMe += exp.amount; 
+                const myShareObj = exp.splitData.find(s => s.personId === 'you');
+                if (myShareObj) personalSpend += myShareObj.share;
+
+                exp.splitData.forEach(s => {
+                    if (s.personId !== 'you' && peopleBalances[s.personId]) {
+                        if (s.isSettled) {
+                            peopleBalances[s.personId].paid += s.share;
+                            collectedTotal += s.share;
+                        } else {
+                            peopleBalances[s.personId].owesMe += s.share;
+                            toReceiveTotal += s.share;
+                        }
+                    }
+                });
+            } else if (peopleBalances[paidBy]) {
+                const myShareObj = exp.splitData.find(s => s.personId === 'you');
+                if (myShareObj && myShareObj.share > 0) {
+                    personalSpend += myShareObj.share;
+                    if (!myShareObj.isSettled) {
+                        peopleBalances[paidBy].iOwe += myShareObj.share;
+                        toPayTotal += myShareObj.share;
                     }
                 }
-            });
+            }
         }
     });
 
     return { 
         personalSpend, 
-        totalPaid, 
+        totalPaid: totalPaidByMe, 
         toReceiveTotal,
+        toPayTotal,
         collectedTotal, 
         peopleBalances 
     };
@@ -800,27 +767,27 @@ window.toggleExpenseExpand = function(expId) {
     renderSettlementsTab();
 };
 
-window.triggerGpayConfirm = function(expId) {
-    document.getElementById('gpay-confirm-exp-id').value = expId;
-    openModal('modal-gpay-confirm');
-};
-
-window.confirmGpayRequest = function() {
-    const expId = document.getElementById('gpay-confirm-exp-id').value;
+window.toggleGpayRequest = function(expId) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp) {
-        exp.gpayRequestStatus = 'sent';
-        exp.gpayRequestSentAt = new Date().toISOString();
+        if (exp.gpayRequestStatus === 'sent') {
+            exp.gpayRequestStatus = 'not_sent';
+            exp.gpayRequestSentAt = null;
+            showToast("Request marked as Not Sent");
+        } else {
+            exp.gpayRequestStatus = 'sent';
+            exp.gpayRequestSentAt = new Date().toISOString();
+            showToast("Request marked as Sent");
+        }
         saveState();
-        closeAllModals();
-        showToast("Marked as sent");
     }
 };
 
 window.toggleParticipantPaid = function(expId, personId) {
     const exp = state.expenses.find(e => e.id === expId);
     if (exp && exp.splitData) {
-        const share = exp.splitData.find(s => s.personId === personId);
+        const targetPersonId = (exp.paidBy !== 'you') ? 'you' : personId;
+        const share = exp.splitData.find(s => s.personId === targetPersonId);
         if (share) {
             share.isSettled = !share.isSettled;
             saveState();
@@ -843,13 +810,17 @@ function renderAll() {
 
 function renderHome() {
     const data = getSettlementData();
-    const currentMonth = new Date().toISOString().slice(0,7); 
+    const currentYear = new Date().getFullYear();
+    const currentMonthNum = new Date().getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+    
     let monthPersonalSpend = 0;
     
     state.expenses.forEach(exp => {
-        if (exp.date.startsWith(currentMonth)) {
+        if (exp.date.startsWith(currentMonthStr)) {
+            const paidBy = exp.paidBy || 'you';
             if (!exp.isSplit) {
-                monthPersonalSpend += exp.amount;
+                if (paidBy === 'you') monthPersonalSpend += exp.amount;
             } else {
                 const myShareObj = exp.splitData.find(s => s.personId === 'you');
                 if (myShareObj) monthPersonalSpend += myShareObj.share;
@@ -884,15 +855,17 @@ function renderRecentExpenses() {
         return timeB - timeA;
     });
     
-    recent.innerHTML = sorted.slice(0, 3).map(e => `
+    recent.innerHTML = sorted.slice(0, 3).map(e => {
+        const tagsHtml = e.tags ? `<span class="text-info text-xs ml-sm">${e.tags}</span>` : '';
+        return `
         <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
             <div class="expense-list-item-left">
                 <h3 class="m-0">${e.desc}</h3>
-                <span class="text-xs text-secondary">${e.date} ${e.isSplit ? '• Split' : ''}</span>
+                <span class="text-xs text-secondary">${e.date} ${e.isSplit ? '• Split' : ''} ${tagsHtml}</span>
             </div>
             <strong class="text-primary">${formatINR(e.amount)}</strong>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 window.renderExpensesListFull = function() {
@@ -911,7 +884,8 @@ window.renderExpensesListFull = function() {
         filtered = filtered.filter(e => 
             e.desc.toLowerCase().includes(searchTerm) || 
             e.amount.toString().includes(searchTerm) ||
-            (e.notes && e.notes.toLowerCase().includes(searchTerm))
+            (e.notes && e.notes.toLowerCase().includes(searchTerm)) ||
+            (e.tags && e.tags.toLowerCase().includes(searchTerm))
         );
     }
     if (monthTerm) {
@@ -952,6 +926,7 @@ window.renderExpensesListFull = function() {
         html += items.map(e => {
             const timeStr = formatTime(e.updatedAt || e.createdAt);
             const notesHtml = e.notes ? `<div class="text-xs text-muted mt-xs" style="font-style: italic;">${e.notes}</div>` : '';
+            const tagsHtml = e.tags ? `<span class="text-info text-xs ml-sm">${e.tags}</span>` : '';
             
             return `
             <div class="card p-md flex-between align-center mb-sm clickable" onclick="editExpense('${e.id}')">
@@ -961,6 +936,7 @@ window.renderExpensesListFull = function() {
                     <div class="text-xs text-secondary mt-xs">
                         ${timeStr}
                         ${e.isSplit ? '<span class="text-primary font-medium ml-sm">Split</span>' : ''}
+                        ${tagsHtml}
                     </div>
                 </div>
                 <strong class="text-primary">${formatINR(e.amount)}</strong>
@@ -989,21 +965,28 @@ function renderSettlementsTab() {
     const container = document.getElementById('settlements-list-container');
     if (!container) return;
     
+    const tagFilterEl = document.getElementById('settlement-tag-search');
+    const tagFilter = tagFilterEl ? tagFilterEl.value.trim().toLowerCase() : '';
+    
     if (settlementView === 'person') {
-        renderSettlementByPerson(container);
+        renderSettlementByPerson(container, tagFilter);
     } else {
-        renderSettlementByExpense(container);
+        renderSettlementByExpense(container, tagFilter);
     }
 }
 
-function renderSettlementByExpense(container) {
-    const data = getSettlementData();
+function renderSettlementByExpense(container, tagFilter) {
+    const data = getSettlementData(tagFilter);
     
-    document.getElementById('settlements-total').innerText = formatINR(data.toReceiveTotal + data.collectedTotal);
-    document.getElementById('settlements-collected').innerText = formatINR(data.collectedTotal);
-    document.getElementById('settlements-pending').innerText = formatINR(data.toReceiveTotal);
+    document.getElementById('settlements-receive').innerText = formatINR(data.toReceiveTotal);
+    document.getElementById('settlements-pay').innerText = formatINR(data.toPayTotal);
+    document.getElementById('settlements-net').innerText = formatINR(data.toReceiveTotal - data.toPayTotal);
     
     let splitExps = state.expenses.filter(e => e.isSplit && e.splitData);
+    if (tagFilter) {
+        splitExps = splitExps.filter(e => (e.tags || '').toLowerCase().includes(tagFilter));
+    }
+    
     let displayList = [];
     
     splitExps.forEach(exp => {
@@ -1012,23 +995,33 @@ function renderSettlementByExpense(container) {
         let myShare = 0;
         let participantsCount = 0;
         let participantsData = [];
+        const paidBy = exp.paidBy || 'you';
         
-        exp.splitData.forEach(s => {
-            if (s.personId === 'you') {
-                myShare = s.share;
-            } else {
-                participantsCount++;
-                const pInfo = state.people.find(p => p.id === s.personId);
-                const pName = pInfo ? pInfo.name : 'Unknown';
-                participantsData.push({ id: s.personId, name: pName, share: s.share, isSettled: s.isSettled });
-                
-                if (s.isSettled) expCollected += s.share;
-                else expPending += s.share;
+        if (paidBy === 'you') {
+            exp.splitData.forEach(s => {
+                if (s.personId === 'you') {
+                    myShare = s.share;
+                } else {
+                    participantsCount++;
+                    const pInfo = state.people.find(p => p.id === s.personId);
+                    participantsData.push({ id: s.personId, name: pInfo ? pInfo.name : 'Unknown', share: s.share, isSettled: s.isSettled });
+                    if (s.isSettled) expCollected += s.share;
+                    else expPending += s.share;
+                }
+            });
+        } else {
+            const myShareObj = exp.splitData.find(s => s.personId === 'you');
+            if (myShareObj && myShareObj.share > 0) {
+                myShare = myShareObj.share;
+                participantsCount = 1; 
+                participantsData.push({ id: 'you', name: 'You', share: myShare, isSettled: myShareObj.isSettled });
+                if (myShareObj.isSettled) expCollected += myShare;
+                else expPending += myShare;
             }
-        });
+        }
         
-        const totalToReceive = expCollected + expPending;
-        if (totalToReceive === 0) return; 
+        const totalRelevant = expCollected + expPending;
+        if (totalRelevant === 0) return; 
         
         const gpaySent = exp.gpayRequestStatus === 'sent';
         const isFullySettled = expPending === 0;
@@ -1042,7 +1035,7 @@ function renderSettlementByExpense(container) {
         
         if (keep) {
             displayList.push({
-                exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled
+                exp, paidBy, myShare, totalRelevant, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled
             });
         }
     });
@@ -1055,9 +1048,21 @@ function renderSettlementByExpense(container) {
     }
     
     container.innerHTML = displayList.map(item => {
-        const { exp, myShare, totalToReceive, expCollected, expPending, participantsCount, participantsData, gpaySent, isFullySettled } = item;
+        const { exp, paidBy, myShare, totalRelevant, expPending, participantsCount, participantsData, gpaySent } = item;
         const isExpanded = !!expandedExpenses[exp.id];
         
+        const payerObj = paidBy === 'you' ? {name:'You'} : state.people.find(p => p.id === paidBy);
+        const payerName = payerObj ? payerObj.name : 'Unknown';
+        
+        const topText1 = paidBy === 'you' ? 'Paid by You' : `Paid by ${payerName}`;
+        const topText2 = `Your share: <strong class="text-primary">${formatINR(myShare)}</strong>`;
+        
+        const midText1 = paidBy === 'you' ? 'To receive' : 'You owe';
+        const midText2Class = paidBy === 'you' ? 'text-success' : 'text-danger';
+        const midText2 = `<strong class="${midText2Class}">${formatINR(totalRelevant)}</strong>`;
+        
+        const tagsHtml = exp.tags ? `<span class="text-info text-xs ml-sm">${exp.tags}</span>` : '';
+
         const participantsHtml = participantsData.map(p => `
             <div class="flex-between align-center py-sm border-bottom" style="padding-top: 8px; padding-bottom: 8px;">
                 <div class="font-medium text-sm">${p.name}</div>
@@ -1071,20 +1076,21 @@ function renderSettlementByExpense(container) {
                 <div class="flex-between align-center mb-sm">
                     <div class="expense-list-item-left">
                         <h3 class="m-0">${exp.desc}</h3>
-                        <span class="text-xs text-secondary">${exp.date}</span>
+                        <span class="text-xs text-secondary">${exp.date} ${tagsHtml}</span>
                     </div>
                     <strong class="text-primary">${formatINR(exp.amount)}</strong>
                 </div>
                 
                 <div class="flex-between align-center text-sm mb-xs">
-                    <span class="text-secondary">Paid by You</span>
-                    <span>Your share: <strong class="text-primary">${formatINR(myShare)}</strong></span>
+                    <span class="text-secondary">${topText1}</span>
+                    <span>${topText2}</span>
                 </div>
                 <div class="flex-between align-center text-sm mb-md pb-md border-bottom">
-                    <span class="text-secondary">To receive</span>
-                    <strong class="text-success">${formatINR(totalToReceive)}</strong>
+                    <span class="text-secondary">${midText1}</span>
+                    ${midText2}
                 </div>
 
+                ${paidBy === 'you' ? `
                 <div class="flex-between align-center mb-sm">
                     <div>
                         <div class="text-xs font-bold text-secondary mb-xs">GPay Group Request</div>
@@ -1097,6 +1103,14 @@ function renderSettlementByExpense(container) {
                         ${gpaySent ? 'Mark Not Sent' : 'Mark Request Sent'}
                     </button>
                 </div>
+                ` : `
+                <div class="flex-between align-center mb-sm">
+                    <div class="text-xs font-bold text-secondary">YOUR PAYMENT</div>
+                    <button class="btn-action-small" onclick="toggleParticipantPaid('${exp.id}', '${paidBy}')">
+                        ${participantsData[0].isSettled ? 'Unmark Paid' : 'Mark as Paid'}
+                    </button>
+                </div>
+                `}
                 
                 <div class="flex-between align-center mt-md">
                     <span class="text-xs text-secondary">${participantsCount} people • ${formatINR(expPending)} pending</span>
@@ -1115,8 +1129,8 @@ function renderSettlementByExpense(container) {
     }).join('');
 }
 
-function renderSettlementByPerson(container) {
-    const data = getSettlementData();
+function renderSettlementByPerson(container, tagFilter) {
+    const data = getSettlementData(tagFilter);
     
     if (state.people.length === 0) {
         container.innerHTML = `<div class="empty-state">No people added yet.</div>`;
@@ -1125,7 +1139,19 @@ function renderSettlementByPerson(container) {
     
     container.innerHTML = Object.keys(data.peopleBalances).map(personId => {
         const p = data.peopleBalances[personId];
-        const totalOwed = p.owes + p.paid;
+        const net = p.owesMe - p.iOwe;
+        
+        if (tagFilter && p.owesMe === 0 && p.iOwe === 0 && p.paid === 0) return '';
+        
+        let netColor = 'text-secondary';
+        let netText = 'Settled up';
+        if (net > 0) {
+            netColor = 'text-success';
+            netText = `Owes you ${formatINR(net)}`;
+        } else if (net < 0) {
+            netColor = 'text-danger';
+            netText = `You owe ${formatINR(Math.abs(net))}`;
+        }
         
         return `
         <div class="card mb-sm">
@@ -1134,45 +1160,153 @@ function renderSettlementByPerson(container) {
                 <button class="btn-ghost text-danger text-xs p-0" onclick="deletePerson('${personId}')">Remove</button>
             </div>
             <div class="flex-between text-sm border-top pt-sm mt-sm">
-                <span class="text-secondary">Total Owed</span>
-                <strong>${formatINR(totalOwed)}</strong>
-            </div>
-            <div class="flex-between text-sm mt-xs">
-                <span class="text-secondary">Paid</span>
-                <strong class="text-success">${formatINR(p.paid)}</strong>
-            </div>
-            <div class="flex-between text-sm mt-xs">
-                <span class="text-secondary">Pending</span>
-                <strong class="text-danger">${formatINR(p.owes)}</strong>
+                <span class="text-secondary">Net Balance</span>
+                <strong class="${netColor}">${netText}</strong>
             </div>
         </div>
         `;
     }).join('');
 }
 
+window.openCategoryDetail = function(catId, catName) {
+    document.getElementById('cat-detail-title').innerText = catName;
+    
+    const tagFilterEl = document.getElementById('analytics-tag-search');
+    const tagFilter = tagFilterEl ? tagFilterEl.value.trim().toLowerCase() : '';
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = now.getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+    
+    let filtered = state.expenses.filter(e => e.category === catId && e.date.startsWith(currentMonthStr));
+    
+    if (tagFilter) {
+        filtered = filtered.filter(e => (e.tags || '').toLowerCase().includes(tagFilter));
+    }
+    
+    let totalAmt = 0;
+    filtered.forEach(exp => {
+        if (!exp.isSplit) {
+            if (exp.paidBy === 'you' || !exp.paidBy) totalAmt += exp.amount;
+        } else {
+            const myShareObj = exp.splitData.find(s => s.personId === 'you');
+            if (myShareObj) totalAmt += myShareObj.share;
+        }
+    });
+    
+    document.getElementById('cat-detail-total').innerText = formatINR(totalAmt);
+    
+    const list = document.getElementById('cat-detail-list');
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty-state text-sm p-md">No expenses match this filter.</div>';
+    } else {
+        const grouped = {};
+        filtered.forEach(exp => {
+            if (!grouped[exp.date]) grouped[exp.date] = [];
+            grouped[exp.date].push(exp);
+        });
+        
+        const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+        let html = '';
+        sortedDates.forEach(dateStr => {
+            const items = grouped[dateStr].sort((a,b) => {
+                const timeA = new Date(a.updatedAt || a.createdAt).getTime();
+                const timeB = new Date(b.updatedAt || b.createdAt).getTime();
+                return timeB - timeA;
+            });
+            const dateHeader = getRelativeDateLabel(dateStr);
+            html += `
+                <div class="mt-sm mb-xs">
+                    <span class="text-xs font-bold text-secondary tracking-wide">${dateHeader.toUpperCase()}</span>
+                    <div class="border-bottom mt-xs mb-xs"></div>
+                </div>
+            `;
+            html += items.map(e => {
+                let displayAmt = e.amount;
+                if (e.isSplit) {
+                    const myS = e.splitData.find(s => s.personId === 'you');
+                    displayAmt = myS ? myS.share : 0;
+                }
+                const tagsHtml = e.tags ? `<span class="text-info text-xs ml-sm">${e.tags}</span>` : '';
+                return `
+                <div class="flex-between align-center mb-sm bg-surface p-sm border-radius-sm shadow-sm">
+                    <span class="font-medium text-sm">${e.desc} ${tagsHtml}</span>
+                    <strong class="text-primary text-sm">${formatINR(displayAmt)}</strong>
+                </div>
+            `}).join('');
+        });
+        list.innerHTML = html;
+    }
+    
+    openModal('modal-category-detail');
+};
+
 function renderAnalytics() {
-    const currentMonth = new Date().toISOString().slice(0,7); 
+    const tagFilterEl = document.getElementById('analytics-tag-search');
+    const tagFilter = tagFilterEl ? tagFilterEl.value.trim().toLowerCase() : '';
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = now.getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+    
+    let prevYear = currentYear;
+    let prevMonthNum = currentMonthNum - 1;
+    if (prevMonthNum === 0) {
+        prevMonthNum = 12;
+        prevYear -= 1;
+    }
+    const prevMonthStr = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
+    
     let monthSpend = 0;
+    let prevMonthSpend = 0;
     let categoryTotals = {};
     
     state.categories.forEach(c => categoryTotals[c.id] = { name: c.name, color: c.color, amount: 0 });
 
     state.expenses.forEach(exp => {
-        if (exp.date.startsWith(currentMonth)) {
-            let myCost = exp.amount;
-            if (exp.isSplit && exp.splitData) {
-                const myShareObj = exp.splitData.find(s => s.personId === 'you');
-                myCost = myShareObj ? myShareObj.share : 0;
-            }
+        if (tagFilter && !(exp.tags || '').toLowerCase().includes(tagFilter)) return;
+
+        let myCost = exp.amount;
+        const paidBy = exp.paidBy || 'you';
+        
+        if (exp.isSplit && exp.splitData) {
+            const myShareObj = exp.splitData.find(s => s.personId === 'you');
+            myCost = myShareObj ? myShareObj.share : 0;
+        } else if (paidBy !== 'you') {
+            myCost = 0; 
+        }
+        
+        if (exp.date.startsWith(currentMonthStr)) {
             monthSpend += myCost;
-            if (categoryTotals[exp.category]) {
-                categoryTotals[exp.category].amount += myCost;
-            }
+            if (categoryTotals[exp.category]) categoryTotals[exp.category].amount += myCost;
+        } else if (exp.date.startsWith(prevMonthStr)) {
+            prevMonthSpend += myCost;
         }
     });
 
     const totalEl = document.getElementById('analytics-total');
     if (totalEl) totalEl.innerText = formatINR(monthSpend);
+    
+    const momEl = document.getElementById('analytics-mom');
+    if (momEl) {
+        if (prevMonthSpend === 0 && monthSpend > 0) {
+            momEl.innerHTML = '<span class="text-danger">▲ 100% from last month</span>';
+        } else if (prevMonthSpend === 0 && monthSpend === 0) {
+            momEl.innerHTML = '<span class="text-secondary">No change from last month</span>';
+        } else {
+            const diff = monthSpend - prevMonthSpend;
+            const pct = (diff / prevMonthSpend) * 100;
+            if (pct > 0) {
+                momEl.innerHTML = `<span class="text-danger">▲ ${pct.toFixed(1)}% from last month</span>`;
+            } else if (pct < 0) {
+                momEl.innerHTML = `<span class="text-success">▼ ${Math.abs(pct).toFixed(1)}% from last month</span>`;
+            } else {
+                momEl.innerHTML = `<span class="text-secondary">No change from last month</span>`;
+            }
+        }
+    }
 
     const pieChart = document.getElementById('pie-chart');
     const pieLegend = document.getElementById('pie-legend');
@@ -1180,7 +1314,7 @@ function renderAnalytics() {
 
     if (monthSpend === 0) {
         pieChart.style.background = 'var(--border)';
-        pieLegend.innerHTML = '<p class="text-center text-secondary text-sm mt-md">No spending this month.</p>';
+        pieLegend.innerHTML = '<p class="text-center text-secondary text-sm mt-md">No spending matches this filter.</p>';
         return;
     }
 
@@ -1197,7 +1331,7 @@ function renderAnalytics() {
         currentAngle += angle;
 
         legendHtml += `
-            <div class="flex-between align-center border-bottom py-sm">
+            <div class="flex-between align-center border-bottom py-sm clickable" onclick="openCategoryDetail('${c.id || Object.keys(categoryTotals).find(k=>categoryTotals[k]===c)}', '${c.name}')">
                 <div class="flex-row align-center gap-sm">
                     <span class="legend-dot" style="background-color: ${c.color}"></span>
                     <span class="text-sm font-medium">${c.name}</span>
