@@ -154,7 +154,7 @@ function loadState() {
             }
         }
     } catch (e) {
-        console.error("Storage load failed", e);
+        console.error("Storage load failed");
     }
 }
 
@@ -768,7 +768,8 @@ window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorag
 
 window.exportCSV = function() {
     if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
+";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     sorted.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
@@ -777,11 +778,24 @@ window.exportCSV = function() {
         if (e.isSplit && e.splitData) {
             pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"\n`;
+        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
+`;
     });
+    
+    // Add Projects to CSV
+    csvContent += "
+
+--- PROJECTS & GOALS ---
+Project Name,Status,Target Budget,Start Date
+";
+    state.projects.forEach(p => {
+        csvContent += `"${p.name.replace(/"/g,'""')}",${p.status},${p.targetBudget},${p.startDate}
+`;
+    });
+    
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
-    a.download = `PocketSplit_Expenses_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `PocketSplit_Export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
 };
 
@@ -807,7 +821,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; // Safe merge
+            state = { ...state, ...parsed }; 
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
