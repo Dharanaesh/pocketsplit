@@ -106,11 +106,10 @@ function loadState() {
             }));
             state.projects = state.projects || [];
             
-            // Migrate old fitness array to new habit dict if needed
             if (Array.isArray(state.fitness)) {
                 state.fitnessLogs = {};
                 state.fitnessTargets = { steps: 10000, water: 3, protein: 120 };
-                state.fitness = undefined; // Drop old format
+                state.fitness = undefined; 
             } else {
                 state.fitnessLogs = state.fitnessLogs || {};
                 state.fitnessTargets = state.fitnessTargets || { steps: 10000, water: 3, protein: 120 };
@@ -139,7 +138,15 @@ window.switchTab = function(tabId) {
         if (n.dataset.target === tabId) n.classList.add('active');
         else n.classList.remove('active');
     });
-    renderAll();
+    
+    // Explicit renders based on tab to ensure logic evaluates freshly
+    if (tabId === 'home') renderHome();
+    if (tabId === 'expenses') renderExpensesListFull();
+    if (tabId === 'projects') renderProjectsList();
+    if (tabId === 'fitness') renderFitnessList();
+    if (tabId === 'tasks') renderTasksAndNotes();
+    if (tabId === 'settlements') renderSettlementsTab();
+    if (tabId === 'analytics') renderAnalytics();
 };
 
 window.toggleTheme = function() {
@@ -583,7 +590,6 @@ function renderFitnessList() {
     const container = document.getElementById('fitness-matrix');
     if(!container) return;
     
-    // Header setup
     let html = `
         <div class="habit-day-col" style="align-items:flex-start; margin-right:12px;">
             <div style="height:28px;"></div>
@@ -593,7 +599,6 @@ function renderFitnessList() {
         </div>
     `;
     
-    // Render last 7 days
     for (let i = 6; i >= 0; i--) {
         const dStr = getLocalISODate(-i);
         const dateObj = new Date(dStr);
@@ -725,8 +730,7 @@ window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorag
 
 window.exportCSV = function() {
     if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
-";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     sorted.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
@@ -735,8 +739,7 @@ window.exportCSV = function() {
         if (e.isSplit && e.splitData) {
             pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
-`;
+        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"\n`;
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
@@ -766,7 +769,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; 
+            state = { ...state, ...parsed }; // Safe merge
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
@@ -775,14 +778,17 @@ window.importData = function(event) {
 
 // --- RENDERERS ---
 function renderAll() {
-    renderHome();
-    renderExpensesListFull();
+    // Explicit renders based on ACTIVE tab only to prevent layout thrashing
+    const activeTab = document.querySelector('.view.active')?.id;
+    if (activeTab === 'view-home') renderHome();
+    if (activeTab === 'view-expenses') renderExpensesListFull();
+    if (activeTab === 'view-projects') renderProjectsList();
+    if (activeTab === 'view-fitness') renderFitnessList();
+    if (activeTab === 'view-tasks') renderTasksAndNotes();
+    if (activeTab === 'view-settlements') renderSettlementsTab();
+    if (activeTab === 'view-analytics') renderAnalytics();
+    
     renderCategoriesModal();
-    renderProjectsList();
-    renderFitnessList();
-    renderTasksAndNotes();
-    if (document.getElementById('view-settlements').classList.contains('active')) renderSettlementsTab();
-    if (document.getElementById('view-analytics').classList.contains('active')) renderAnalytics();
     
     // Auto-populate edit project modal targets
     if (document.getElementById('fit-tgt-steps')) {
@@ -812,6 +818,8 @@ function renderHome() {
     if (state.budget > 0) {
         const left = state.budget - monthPersonalSpend;
         document.getElementById('dash-budget-status').innerHTML = `Budget left: <strong class="${left<0?'text-danger':''}">${formatINR(left)}</strong>`;
+    } else {
+        document.getElementById('dash-budget-status').innerText = 'No budget set';
     }
     
     const pendingTasks = state.tasks.filter(t => !t.completed).length;
@@ -821,7 +829,7 @@ function renderHome() {
     const recent = document.getElementById('dash-expenses-list');
     const sortedExp = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     recent.innerHTML = sortedExp.slice(0, 3).map(e => `
-        <div class="list-item p-sm clickable border-bottom" onclick="switchTab('expenses')">
+        <div class="list-item p-sm clickable border-bottom" onclick="editExpense('${e.id}')">
             <div class="expense-list-item-left">
                 <h3 class="m-0 text-sm">${e.desc}</h3>
                 <span class="text-xs text-secondary">${e.date}</span>
