@@ -14,11 +14,11 @@
     <div id="login-screen" class="active">
         <div class="login-container">
             <div class="login-logo">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="min-width: 32px;"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
             </div>
             <h1>PocketSplit</h1>
             <p class="text-secondary mb-xl">Your personal life manager</p>
-            <form onsubmit="handleLogin(event)" class="w-100 px-md">
+            <form onsubmit="handleLogin(event); return false;" class="w-100 px-md">
                 <input type="password" id="access-code" placeholder="Enter access code" class="input-lg text-center mb-md" required>
                 <p id="login-error" class="text-danger text-sm mb-md" style="display:none;">Invalid access code</p>
                 <button type="submit" class="btn btn-primary w-100">Continue</button>
@@ -32,43 +32,45 @@
         <!-- Desktop Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="min-width: 24px;"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
                 <h2>PocketSplit</h2>
             </div>
             <nav class="sidebar-nav">
                 <button class="nav-item active" onclick="switchTab('home')" data-target="home">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Dashboard
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Dashboard
                 </button>
                 <button class="nav-item" onclick="switchTab('expenses')" data-target="expenses">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> Expenses
-                </button>
-                <button class="nav-item" onclick="switchTab('projects')" data-target="projects">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg> Projects
-                </button>
-                <button class="nav-item" onclick="switchTab('fitness')" data-target="fitness">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v8H2z"></path><path d="M6 8v8"></path><path d="M14 8v8"></path></svg> Fitness
-                </button>
-                <button class="nav-item" onclick="switchTab('tasks')" data-target="tasks">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Notes & Tasks
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> Expenses
                 </button>
                 <button class="nav-item" onclick="switchTab('settlements')" data-target="settlements">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg> Settlements
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg> Settlements
                 </button>
                 <button class="nav-item" onclick="switchTab('analytics')" data-target="analytics">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Reports
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Reports
                 </button>
+                <button class="nav-item" onclick="switchTab('projects')" data-target="projects">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg> Projects
+                </button>
+                <button class="nav-item" onclick="switchTab('fitness')" data-target="fitness">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v8H2z"></path><path d="M6 8v8"></path><path d="M14 8v8"></path></svg> Habits
+                </button>
+                <button class="nav-item" onclick="switchTab('tasks')" data-target="tasks">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Notes & Tasks
+                </button>
+                
                 <div class="sidebar-divider"></div>
-                <button class="nav-item" onclick="switchTab('menu')" data-target="menu">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><circle cx="12" cy="12" r="3"></circle></svg> Settings
+                <button class="nav-item" onclick="switchTab('settings')" data-target="settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg> Settings
                 </button>
             </nav>
         </aside>
 
+        <!-- Main Content Area -->
         <main id="main-content">
             <header id="mobile-header" class="mobile-only">
-                <h1 id="header-title" class="page-title">Dashboard</h1>
+                <h1 id="header-title" class="page-title">PocketSplit</h1>
                 <button class="icon-btn" onclick="toggleTheme()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                 </button>
             </header>
 
@@ -104,8 +106,8 @@
                     <div class="grid-2 p-sm gap-sm">
                         <button class="btn btn-secondary text-sm" onclick="openExpenseModal()">+ Expense</button>
                         <button class="btn btn-secondary text-sm" onclick="switchTab('tasks'); openModal('modal-task')">+ Task</button>
-                        <button class="btn btn-secondary text-sm" onclick="switchTab('fitness')">+ Workout</button>
-                        <button class="btn btn-secondary text-sm" onclick="switchTab('projects'); openModal('modal-project')">+ Project</button>
+                        <button class="btn btn-secondary text-sm" onclick="switchTab('projects'); openProjectModal()">+ Project</button>
+                        <button class="btn btn-secondary text-sm" onclick="triggerQuickAdd()">+ Quick Add</button>
                     </div>
                 </div>
 
@@ -127,7 +129,7 @@
                 </div>
                 <div class="filter-bar mb-md">
                     <div class="search-input-wrapper flex-1">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 18px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <input type="text" id="expense-search" placeholder="Search expenses or #tags..." oninput="renderExpensesListFull()">
                     </div>
                     <input type="month" id="expense-month" class="input-standard" style="width: auto;" onchange="renderExpensesListFull()">
@@ -135,88 +137,17 @@
                 <div id="expenses-list" class="flex-col gap-sm pb-xl"></div>
             </section>
 
-            <!-- 3. PROJECTS VIEW -->
-            <section id="view-projects" class="view">
-                <div class="flex-between align-center mb-md">
-                    <h1 class="page-title">Projects & Goals</h1>
-                    <button class="btn btn-primary btn-sm" onclick="openProjectModal()">+ New Project</button>
-                </div>
-                <div id="projects-list-container" class="flex-col gap-md pb-xl"></div>
-            </section>
-
-            <!-- 3b. PROJECT DETAIL VIEW -->
-            <section id="view-project-detail" class="view">
-                <div class="flex-between align-center mb-md">
-                    <div class="flex-row align-center gap-sm">
-                        <button class="icon-btn" onclick="switchTab('projects')" style="background: var(--bg-secondary);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
-                        <h1 class="page-title m-0" id="pd-title">Project</h1>
-                    </div>
-                    <button class="btn btn-secondary btn-sm" onclick="openProjectModal(currentProjectViewId)">Edit Project</button>
-                </div>
-                
-                <div class="card mb-md p-md">
-                    <div class="flex-between text-sm mb-xs">
-                        <span class="text-secondary">Spent / Budget</span>
-                        <strong id="pd-amounts">₹0 / ₹0</strong>
-                    </div>
-                    <div class="progress-bg mb-xs">
-                        <div id="pd-progress" class="progress-fill"></div>
-                    </div>
-                    <div class="text-xs text-secondary text-right" id="pd-pct">0%</div>
-                </div>
-
-                <div class="flex-between align-center mb-md mt-lg">
-                    <h3 class="section-title">Transactions</h3>
-                    <button class="btn btn-secondary btn-sm" onclick="openProjectTxModal()">+ Add Trans.</button>
-                </div>
-                
-                <div id="project-tx-list" class="flex-col gap-sm pb-xl"></div>
-            </section>
-
-            <!-- 4. FITNESS VIEW (HABIT MATRIX) -->
-            <section id="view-fitness" class="view">
-                <div class="flex-between align-center mb-md">
-                    <h1 class="page-title">Fitness Habits</h1>
-                    <button class="btn btn-secondary btn-sm" onclick="openModal('modal-fitness-targets')">Set Targets</button>
-                </div>
-                
-                <div class="card p-sm overflow-x-auto">
-                    <div id="fitness-matrix" class="habit-matrix"></div>
-                </div>
-                
-            </section>
-
-            <!-- 5. TASKS & NOTES VIEW -->
-            <section id="view-tasks" class="view">
-                <div class="flex-between align-center mb-md">
-                    <h1 class="page-title">Notes & Tasks</h1>
-                </div>
-                <div class="segmented-control mb-md">
-                    <button type="button" class="seg-btn active" id="btn-view-todo" onclick="setTNView('todo')">Tasks</button>
-                    <button type="button" class="seg-btn" id="btn-view-notes" onclick="setTNView('notes')">Notes</button>
-                </div>
-                
-                <div id="tn-todo-area">
-                    <button class="btn btn-secondary w-100 mb-md" onclick="openModal('modal-task')">+ Add Task</button>
-                    <div id="tasks-list-container" class="flex-col gap-xs pb-xl"></div>
-                </div>
-                
-                <div id="tn-notes-area" style="display:none;">
-                    <button class="btn btn-secondary w-100 mb-md" onclick="openModal('modal-note')">+ Add Note</button>
-                    <div id="notes-list-container" class="grid-2 gap-sm pb-xl"></div>
-                </div>
-            </section>
-
-            <!-- 6. SETTLEMENTS VIEW -->
+            <!-- 3. SETTLEMENTS VIEW -->
             <section id="view-settlements" class="view">
                 <div class="flex-between align-center mb-md">
-                    <h1 class="page-title">Settlements</h1>
+                    <h1 class="page-title mobile-only">Settlements</h1>
+                    <h1 class="page-title desktop-only">Settlements</h1>
                     <button class="btn btn-secondary btn-sm ml-auto" onclick="openModal('modal-person')">+ Add Person</button>
                 </div>
                 
                 <div class="filter-bar mb-md">
                     <div class="search-input-wrapper flex-1">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 18px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <input type="text" id="settlement-tag-search" placeholder="Filter by context tag (e.g. #GoaTrip)..." oninput="renderSettlementsTab()">
                     </div>
                 </div>
@@ -252,13 +183,13 @@
                 <div id="settlements-list-container" class="flex-col gap-md pb-xl"></div>
             </section>
 
-            <!-- 7. ANALYTICS & REPORTS VIEW -->
+            <!-- 4. ANALYTICS & REPORTS VIEW -->
             <section id="view-analytics" class="view">
                 <h1 class="page-title mb-md">Reports</h1>
                 
                 <div class="filter-bar mb-md">
                     <div class="search-input-wrapper flex-1">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 18px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <input type="text" id="analytics-tag-search" placeholder="Filter by context tag (e.g. #GoaTrip)..." oninput="renderAnalytics()">
                     </div>
                 </div>
@@ -278,35 +209,35 @@
                 </div>
             </section>
 
-            <!-- 8. MENU / SETTINGS VIEW (App Drawer Style) -->
+            <!-- 5. MENU / APP DRAWER -->
             <section id="view-menu" class="view pb-xl">
                 <h1 class="page-title mb-lg">Menu & Settings</h1>
                 
                 <div class="grid-2 gap-sm mb-lg">
                     <div class="card text-center p-md clickable flex-col align-center gap-xs" onclick="switchTab('settlements')">
-                        <div class="icon-container" style="background: var(--info);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg></div>
+                        <div class="icon-container" style="color: var(--info);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg></div>
                         <span class="font-medium text-sm mt-xs">Settlements</span>
                     </div>
                     <div class="card text-center p-md clickable flex-col align-center gap-xs" onclick="switchTab('analytics')">
-                        <div class="icon-container" style="background: var(--warning);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
+                        <div class="icon-container" style="color: var(--warning);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
                         <span class="font-medium text-sm mt-xs">Analytics</span>
                     </div>
                     <div class="card text-center p-md clickable flex-col align-center gap-xs" onclick="openModal('modal-category-manage')">
-                        <div class="icon-container" style="background: var(--primary);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+                        <div class="icon-container" style="color: var(--primary);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
                         <span class="font-medium text-sm mt-xs">Categories</span>
                     </div>
                     <div class="card text-center p-md clickable flex-col align-center gap-xs" onclick="openModal('modal-budget')">
-                        <div class="icon-container" style="background: var(--success);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
+                        <div class="icon-container" style="color: var(--success);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
                         <span class="font-medium text-sm mt-xs">Budget</span>
                     </div>
                 </div>
 
                 <div class="card p-0 mb-md overflow-hidden">
                     <div class="list-item clickable" onclick="exportCSV()">
-                        <span>Export Expenses CSV</span>
+                        <span>Export CSV (.csv)</span>
                     </div>
                     <div class="list-item clickable border-top" onclick="exportData()">
-                        <span>Export Full JSON Backup</span>
+                        <span>Export Full Backup (.json)</span>
                     </div>
                     <label class="list-item clickable m-0 border-top">
                         <span>Import Backup</span>
@@ -323,35 +254,126 @@
                     </div>
                 </div>
                 
-                <p class="text-center text-muted text-sm">PocketSplit Life v2.1.0</p>
+                <p class="text-center text-muted text-sm">PocketSplit Life v2.3.0</p>
+            </section>
+            
+            <!-- 6. PROJECTS VIEW -->
+            <section id="view-projects" class="view">
+                <div class="flex-between align-center mb-md">
+                    <h1 class="page-title">Projects & Goals</h1>
+                    <button class="btn btn-primary btn-sm" onclick="openProjectModal()">+ New Project</button>
+                </div>
+                <div id="projects-list-container" class="flex-col gap-md pb-xl"></div>
+            </section>
+
+            <!-- 6b. PROJECT DETAIL VIEW -->
+            <section id="view-project-detail" class="view">
+                <div class="flex-between align-center mb-md">
+                    <div class="flex-row align-center gap-sm">
+                        <button class="icon-btn" onclick="switchTab('projects')" style="background: var(--bg-secondary);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+                        <h1 class="page-title m-0" id="pd-title">Project</h1>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="openProjectModal(currentProjectViewId)">Edit Project</button>
+                </div>
+                
+                <div class="card mb-md p-md">
+                    <div class="flex-between text-sm mb-xs">
+                        <span class="text-secondary">Spent / Budget</span>
+                        <strong id="pd-amounts">₹0 / ₹0</strong>
+                    </div>
+                    <div class="progress-bg mb-xs">
+                        <div id="pd-progress" class="progress-fill"></div>
+                    </div>
+                    <div class="text-xs text-secondary text-right" id="pd-pct">0%</div>
+                </div>
+
+                <div class="flex-between align-center mb-md mt-lg">
+                    <h3 class="section-title">Transactions</h3>
+                    <button class="btn btn-secondary btn-sm" onclick="openProjectTxModal()">+ Add Trans.</button>
+                </div>
+                
+                <div id="project-tx-list" class="flex-col gap-sm pb-xl"></div>
+            </section>
+
+            <!-- 7. FITNESS VIEW (HABIT CALENDAR) -->
+            <section id="view-fitness" class="view">
+                <div class="flex-between align-center mb-md">
+                    <h1 class="page-title">Habit Tracker</h1>
+                    <button class="btn btn-secondary btn-sm" onclick="openModal('modal-fitness-targets')">⚙ Targets</button>
+                </div>
+                
+                <div class="card mb-md p-md">
+                    <div class="flex-between align-center mb-sm">
+                        <span class="font-bold">Steps</span>
+                        <span class="text-xs text-secondary" id="habits-steps-tgt">Goal: 10000</span>
+                    </div>
+                    <div id="habit-grid-steps" class="habit-grid"></div>
+                </div>
+                
+                <div class="card mb-md p-md">
+                    <div class="flex-between align-center mb-sm">
+                        <span class="font-bold">Water</span>
+                        <span class="text-xs text-secondary" id="habits-water-tgt">Goal: 3L</span>
+                    </div>
+                    <div id="habit-grid-water" class="habit-grid"></div>
+                </div>
+                
+                <div class="card mb-md p-md">
+                    <div class="flex-between align-center mb-sm">
+                        <span class="font-bold">Protein</span>
+                        <span class="text-xs text-secondary" id="habits-protein-tgt">Goal: 120g</span>
+                    </div>
+                    <div id="habit-grid-protein" class="habit-grid"></div>
+                </div>
+            </section>
+
+            <!-- 8. TASKS & NOTES VIEW -->
+            <section id="view-tasks" class="view">
+                <div class="flex-between align-center mb-md">
+                    <h1 class="page-title">Notes & Tasks</h1>
+                </div>
+                <div class="segmented-control mb-md">
+                    <button type="button" class="seg-btn active" id="btn-view-todo" onclick="setTNView('todo')">Tasks</button>
+                    <button type="button" class="seg-btn" id="btn-view-notes" onclick="setTNView('notes')">Notes</button>
+                </div>
+                
+                <div id="tn-todo-area">
+                    <button class="btn btn-secondary w-100 mb-md" onclick="openModal('modal-task')">+ Add Task</button>
+                    <div id="tasks-list-container" class="flex-col gap-xs pb-xl"></div>
+                </div>
+                
+                <div id="tn-notes-area" style="display:none;">
+                    <button class="btn btn-secondary w-100 mb-md" onclick="openModal('modal-note')">+ Add Note</button>
+                    <div id="notes-list-container" class="grid-2 gap-sm pb-xl"></div>
+                </div>
             </section>
         </main>
 
         <!-- Floating Action Button (Mobile) -->
         <button class="fab mobile-only" onclick="openExpenseModal()">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
 
-        <!-- Bottom Navigation -->
+        <!-- Fixed Bottom Navigation (Mobile Only) -->
         <nav id="bottom-nav" class="mobile-only">
             <button class="nav-item active" onclick="switchTab('home')" data-target="home">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
                 <span>Home</span>
             </button>
             <button class="nav-item" onclick="switchTab('expenses')" data-target="expenses">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                 <span>Expenses</span>
             </button>
-            <button class="nav-item" onclick="switchTab('projects')" data-target="projects">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
-                <span>Projects</span>
+            <button class="nav-item" onclick="switchTab('settlements')" data-target="settlements">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                <span>Settles</span>
             </button>
-            <button class="nav-item" onclick="switchTab('fitness')" data-target="fitness">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v8H2z"></path><path d="M6 8v8"></path><path d="M14 8v8"></path></svg>
-                <span>Habits</span>
+            <button class="nav-item" onclick="switchTab('analytics')" data-target="analytics">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>Reports</span>
             </button>
             <button class="nav-item" onclick="switchTab('menu')" data-target="menu">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><circle cx="12" cy="12" r="3"></circle></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 <span>Menu</span>
             </button>
         </nav>
@@ -364,12 +386,11 @@
     <div class="modal bottom-sheet" id="modal-expense">
         <div class="modal-header">
             <h3 id="modal-expense-title">Add Expense</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveExpense(event)">
+            <form onsubmit="saveExpense(event); return false;">
                 <input type="hidden" id="exp-id">
-                
                 <div class="form-group">
                     <label>Amount</label>
                     <div class="amount-input-wrapper">
@@ -436,11 +457,11 @@
     <!-- ADD PROJECT MODAL -->
     <div class="modal bottom-sheet" id="modal-project">
         <div class="modal-header">
-            <h3 id="modal-project-title">New Project / Goal</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <h3 id="modal-project-title">Project Details</h3>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveProject(event)">
+            <form onsubmit="saveProject(event); return false;">
                 <input type="hidden" id="proj-id">
                 <div class="form-group">
                     <label>Project Name</label>
@@ -475,10 +496,10 @@
     <div class="modal center-modal" id="modal-project-tx">
         <div class="modal-header">
             <h3>Add Transaction</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveProjectTx(event)">
+            <form onsubmit="saveProjectTx(event); return false;">
                 <input type="hidden" id="ptx-id">
                 <div class="form-group">
                     <label>Type</label>
@@ -513,10 +534,10 @@
     <div class="modal center-modal" id="modal-fitness-targets">
         <div class="modal-header">
             <h3>Set Daily Targets</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveFitnessTargets(event)">
+            <form onsubmit="saveFitnessTargets(event); return false;">
                 <div class="form-group">
                     <label>Daily Steps Goal</label>
                     <input type="number" id="fit-tgt-steps" class="input-standard" placeholder="e.g. 10000">
@@ -540,10 +561,10 @@
     <div class="modal center-modal" id="modal-task">
         <div class="modal-header">
             <h3>Add Task</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveTask(event)">
+            <form onsubmit="saveTask(event); return false;">
                 <input type="hidden" id="task-id">
                 <div class="form-group">
                     <label>Task Title</label>
@@ -562,10 +583,10 @@
     <div class="modal bottom-sheet" id="modal-note">
         <div class="modal-header">
             <h3>Add Note</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveNote(event)">
+            <form onsubmit="saveNote(event); return false;">
                 <input type="hidden" id="note-id">
                 <div class="form-group">
                     <label>Title</label>
@@ -583,11 +604,11 @@
         </div>
     </div>
 
-    <!-- OLDER MODALS: WARNINGS, GPAY, BUDGET, CAT -->
+    <!-- OTHER MODALS -->
     <div class="modal center-modal" id="modal-split-warning">
         <div class="modal-header">
             <h3>Warning</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body text-center">
             <p class="mb-lg text-sm">This expense already has payments recorded. Changing the amount or split may affect existing settlement data. Continue?</p>
@@ -597,10 +618,11 @@
             </div>
         </div>
     </div>
+    
     <div class="modal bottom-sheet" id="modal-category-detail">
         <div class="modal-header">
             <h3 id="cat-detail-title">Category Details</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body p-0">
             <div class="p-md bg-secondary flex-between align-center border-bottom">
@@ -610,13 +632,14 @@
             <div id="cat-detail-list" class="p-md flex-col gap-sm pb-xl"></div>
         </div>
     </div>
+    
     <div class="modal center-modal" id="modal-person">
         <div class="modal-header">
             <h3>Add Person</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="savePerson(event)">
+            <form onsubmit="savePerson(event); return false;">
                 <input type="hidden" id="person-id">
                 <div class="form-group">
                     <label>Name</label>
@@ -626,13 +649,14 @@
             </form>
         </div>
     </div>
+    
     <div class="modal bottom-sheet" id="modal-category-manage">
         <div class="modal-header">
             <h3>Categories</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="addCategory(event)" class="flex-row gap-sm mb-lg">
+            <form onsubmit="addCategory(event); return false;" class="flex-row gap-sm mb-lg">
                 <input type="text" id="new-cat-name" class="input-standard flex-1" placeholder="New Category" required>
                 <input type="color" id="new-cat-color" class="color-picker" value="#5B5FEF">
                 <button type="submit" class="btn btn-primary">Add</button>
@@ -640,13 +664,14 @@
             <div id="category-manage-list" class="flex-col gap-sm"></div>
         </div>
     </div>
+    
     <div class="modal center-modal" id="modal-budget">
         <div class="modal-header">
             <h3>Monthly Budget</h3>
-            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="min-width: 24px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn-ghost icon-only" onclick="closeAllModals()"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         <div class="modal-body">
-            <form onsubmit="saveBudget(event)">
+            <form onsubmit="saveBudget(event); return false;">
                 <div class="form-group">
                     <label>Total Budget (₹)</label>
                     <input type="number" id="budget-amount" class="input-standard" required min="0.01" step="0.01">
@@ -657,7 +682,6 @@
         </div>
     </div>
 
-    <!-- Toast Notification -->
     <div id="toast" class="toast">Action successful</div>
 
     <script src="app.js"></script>

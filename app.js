@@ -70,6 +70,7 @@ window.handleLogin = function(e) {
     } else {
         document.getElementById('login-error').style.display = 'block';
     }
+    return false;
 };
 
 function unlockAppSuccess() {
@@ -118,6 +119,7 @@ function loadState() {
                 createdAt: e.createdAt || new Date().toISOString(), updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
             
+            // Fix Crash: Map empty array if missing
             state.projects = state.projects || [];
             state.projects.forEach(p => p.transactions = p.transactions || []);
             
@@ -133,7 +135,8 @@ function loadState() {
             state.tasks = state.tasks || [];
             state.notes = state.notes || [];
             
-            if (!state.categories || state.categories.length === 0 || (state.categories.length === 1 && state.categories[0].name === 'General')) {
+            // Only overwrite categories if completely empty to allow user additions
+            if (!state.categories || state.categories.length === 0) {
                 state.categories = [
                     { id: 'c_rent', name: 'Rent', color: '#EF4444' },
                     { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
@@ -151,7 +154,7 @@ function loadState() {
             }
         }
     } catch (e) {
-        console.error("Storage load failed");
+        console.error("Storage load failed", e);
     }
 }
 
@@ -407,13 +410,14 @@ window.saveExpense = function(e) {
                     });
                     pendingSavePayload = { id, amount, desc, notes, tags, category, paidBy, date: dateStr, isSplit, splitType, splitData, gpayRequestStatus, gpayRequestSentAt, createdAt, updatedAt };
                     if (invalidPayment) throw new Error("Cannot lower share below what is paid.");
-                    else { openModal('modal-split-warning'); return; }
+                    else { openModal('modal-split-warning'); return false; }
                 }
             }
         }
         executeExpenseSave({ id, amount, desc, notes, tags, category, paidBy, date: dateStr, isSplit, splitType, splitData, gpayRequestStatus, gpayRequestSentAt, createdAt, updatedAt });
     } catch (err) { alert(err.message); } 
     finally { setTimeout(() => btn.disabled = false, 500); }
+    return false;
 };
 
 window.forceSaveExpense = function() {
@@ -529,6 +533,7 @@ window.saveProject = function(e) {
     } catch (err) {
         alert("Error saving project: " + err.message);
     }
+    return false;
 };
 
 window.deleteProject = function() {
@@ -576,9 +581,9 @@ window.openProjectTxModal = function(txId = '') {
 
 window.saveProjectTx = function(e) {
     e.preventDefault();
-    if(!currentProjectViewId) return;
+    if(!currentProjectViewId) return false;
     const pIdx = state.projects.findIndex(x => x.id === currentProjectViewId);
-    if(pIdx < 0) return;
+    if(pIdx < 0) return false;
     
     const id = document.getElementById('ptx-id').value || 'ptx_' + Date.now();
     const type = document.getElementById('ptx-type').value;
@@ -594,6 +599,7 @@ window.saveProjectTx = function(e) {
     else state.projects[pIdx].transactions.push(tx);
     
     saveState(); closeAllModals(); openProjectDetail(currentProjectViewId);
+    return false;
 };
 
 window.deleteProjectTx = function() {
@@ -611,6 +617,7 @@ window.saveFitnessTargets = function(e) {
     state.fitnessTargets.water = parseFloat(document.getElementById('fit-tgt-water').value) || 0;
     state.fitnessTargets.protein = parseInt(document.getElementById('fit-tgt-protein').value) || 0;
     saveState(); closeAllModals(); showToast("Targets updated");
+    return false;
 };
 
 window.toggleFitnessHabit = function(dateStr, habitType) {
@@ -668,6 +675,7 @@ window.saveTask = function(e) {
     });
     document.getElementById('task-title').value = '';
     saveState(); closeAllModals();
+    return false;
 };
 
 window.toggleTask = function(id) {
@@ -695,6 +703,7 @@ window.saveNote = function(e) {
     document.getElementById('note-title').value = '';
     document.getElementById('note-content').value = '';
     saveState(); closeAllModals();
+    return false;
 };
 
 window.openNoteModal = function(id = '') {
@@ -720,6 +729,7 @@ window.savePerson = function(e) {
     state.people.push({ id: 'p_' + Date.now(), name });
     document.getElementById('person-name').value = '';
     saveState(); closeAllModals();
+    return false;
 };
 
 window.deletePerson = function(id) {
@@ -737,6 +747,7 @@ window.addCategory = function(e) {
     state.categories.push({ id: 'c_' + Date.now(), name, color });
     document.getElementById('new-cat-name').value = '';
     saveState();
+    return false;
 };
 
 window.deleteCategory = function(id) {
@@ -750,14 +761,14 @@ window.saveBudget = function(e) {
     e.preventDefault(); 
     state.budget = roundToTwo(parseFloat(document.getElementById('budget-amount').value) || 0); 
     saveState(); closeAllModals(); 
+    return false;
 };
 window.removeBudget = function() { state.budget = 0; saveState(); closeAllModals(); };
 window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorage.clear(); window.location.reload(); } };
 
 window.exportCSV = function() {
     if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
-";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     sorted.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
@@ -766,8 +777,7 @@ window.exportCSV = function() {
         if (e.isSplit && e.splitData) {
             pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
-`;
+        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"\n`;
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
@@ -1138,36 +1148,16 @@ function renderAnalytics() {
     pieLegend.innerHTML = legendHtml;
 }
 
-function renderTasksAndNotes() {
-    const tc = document.getElementById('tasks-list-container');
-    const nc = document.getElementById('notes-list-container');
-    if(!tc || !nc) return;
-    
-    const pending = state.tasks.filter(t=>!t.completed);
-    const done = state.tasks.filter(t=>t.completed);
-    let tHtml = pending.map(t => `
-        <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm shadow-sm mb-xs">
-            <input type="checkbox" class="task-checkbox" onchange="toggleTask('${t.id}')">
-            <div class="flex-1 text-sm font-medium">${t.title} ${t.dueDate ? `<span class="text-xs text-danger ml-sm">${t.dueDate}</span>`:''}</div>
-            <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
+function renderCategoriesModal() {
+    const list = document.getElementById('category-manage-list');
+    if (!list) return;
+    list.innerHTML = state.categories.map(c => `
+        <div class="list-item p-sm border-bottom flex-between">
+            <div class="flex-row align-center gap-sm">
+                <div style="width:16px;height:16px;border-radius:4px;background:${c.color}"></div>
+                <span>${c.name}</span>
+            </div>
+            <button class="btn-ghost text-danger text-xs" onclick="deleteCategory('${c.id}')">Delete</button>
         </div>
     `).join('');
-    if(done.length > 0) {
-        tHtml += `<div class="text-xs text-secondary font-bold mt-md mb-xs">COMPLETED</div>`;
-        tHtml += done.map(t => `
-            <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm mb-xs" style="opacity:0.6">
-                <input type="checkbox" class="task-checkbox" checked onchange="toggleTask('${t.id}')">
-                <div class="flex-1 text-sm text-secondary" style="text-decoration:line-through">${t.title}</div>
-                <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
-            </div>
-        `).join('');
-    }
-    tc.innerHTML = tHtml || '<div class="empty-state p-md">No tasks.</div>';
-    
-    nc.innerHTML = state.notes.map(n => `
-        <div class="card p-md clickable flex-col" onclick="openNoteModal('${n.id}')">
-            <h3 class="m-0 text-sm mb-xs">${n.title}</h3>
-            <p class="text-xs text-secondary" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${n.content}</p>
-        </div>
-    `).join('') || '<div class="empty-state p-md" style="grid-column: span 2">No notes.</div>';
 }
