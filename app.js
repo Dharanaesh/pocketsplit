@@ -13,7 +13,8 @@ let state = {
     categories: [],
     budget: 0,
     projects: [], // [{ id, name, targetBudget, startDate, status, transactions: [] }]
-    fitness: [], // [{ id, date, weight, steps, workout, water, sleep }]
+    fitnessTargets: { steps: 10000, water: 3, protein: 120 },
+    fitnessLogs: {}, // { '2026-10-18': { steps: true, water: false, protein: true } }
     tasks: [], // [{ id, title, dueDate, completed }]
     notes: [] // [{ id, title, content, updatedAt }]
 };
@@ -21,7 +22,6 @@ let state = {
 let currentSplitType = 'equal';
 let splitDataState = []; 
 let currentProjectViewId = null;
-
 let settlementView = 'expense'; 
 let settlementFilter = 'all'; 
 let expandedExpenses = {}; 
@@ -29,6 +29,13 @@ let pendingSavePayload = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
+    
+    // Automatically set expense month input to current month if it exists and is empty
+    const mInput = document.getElementById('expense-month');
+    if (mInput && !mInput.value) {
+        mInput.value = getLocalISODate().slice(0, 7);
+    }
+    
     if (!localStorage.getItem(PIN_KEY)) localStorage.setItem(PIN_KEY, '1234'); 
     const savedCode = localStorage.getItem(PIN_KEY);
     if (savedCode && !window.POCKETSPLIT_AUTH.isUnlocked) {
@@ -98,7 +105,17 @@ function loadState() {
                 createdAt: e.createdAt || new Date().toISOString(), updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
             state.projects = state.projects || [];
-            state.fitness = state.fitness || [];
+            
+            // Migrate old fitness array to new habit dict if needed
+            if (Array.isArray(state.fitness)) {
+                state.fitnessLogs = {};
+                state.fitnessTargets = { steps: 10000, water: 3, protein: 120 };
+                state.fitness = undefined; // Drop old format
+            } else {
+                state.fitnessLogs = state.fitnessLogs || {};
+                state.fitnessTargets = state.fitnessTargets || { steps: 10000, water: 3, protein: 120 };
+            }
+            
             state.tasks = state.tasks || [];
             state.notes = state.notes || [];
             if (!state.categories || state.categories.length === 0) {
@@ -155,8 +172,9 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function getLocalISODate() {
+function getLocalISODate(offsetDays = 0) {
     const localDate = new Date();
+    localDate.setDate(localDate.getDate() + offsetDays);
     return new Date(localDate.getTime() - (localDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 }
 
@@ -473,6 +491,7 @@ window.saveProject = function(e) {
         state.projects.push(proj);
     }
     saveState(); closeAllModals(); showToast("Project saved");
+    if(currentProjectViewId === id) openProjectDetail(id);
 };
 
 window.deleteProject = function() {
@@ -545,39 +564,59 @@ window.deleteProjectTx = function() {
     saveState(); closeAllModals(); openProjectDetail(currentProjectViewId);
 };
 
-// --- MODULE: FITNESS ---
-window.openFitnessModal = function() {
-    document.getElementById('fit-id').value = '';
-    document.getElementById('fit-date').value = getLocalISODate();
-    document.getElementById('fit-weight').value = '';
-    document.getElementById('fit-steps').value = '';
-    document.getElementById('fit-workout').value = '';
-    document.getElementById('fit-water').value = '';
-    document.getElementById('fit-sleep').value = '';
-    openModal('modal-fitness');
+// --- MODULE: FITNESS HABITS ---
+window.saveFitnessTargets = function(e) {
+    e.preventDefault();
+    state.fitnessTargets.steps = parseInt(document.getElementById('fit-tgt-steps').value) || 0;
+    state.fitnessTargets.water = parseFloat(document.getElementById('fit-tgt-water').value) || 0;
+    state.fitnessTargets.protein = parseInt(document.getElementById('fit-tgt-protein').value) || 0;
+    saveState(); closeAllModals(); showToast("Targets updated");
 };
 
-window.saveFitness = function(e) {
-    e.preventDefault();
-    const date = document.getElementById('fit-date').value;
-    // Check if entry for date exists
-    let existingIdx = state.fitness.findIndex(x => x.date === date);
-    
-    const entry = {
-        id: 'fit_' + Date.now(),
-        date: date,
-        weight: parseFloat(document.getElementById('fit-weight').value) || null,
-        steps: parseInt(document.getElementById('fit-steps').value) || 0,
-        workout: document.getElementById('fit-workout').value.trim(),
-        water: parseFloat(document.getElementById('fit-water').value) || 0,
-        sleep: parseFloat(document.getElementById('fit-sleep').value) || 0
-    };
-    
-    if (existingIdx >= 0) state.fitness[existingIdx] = { ...state.fitness[existingIdx], ...entry };
-    else state.fitness.push(entry);
-    
-    saveState(); closeAllModals(); showToast("Log saved");
+window.toggleFitnessHabit = function(dateStr, habitType) {
+    if (!state.fitnessLogs[dateStr]) state.fitnessLogs[dateStr] = { steps: false, water: false, protein: false };
+    state.fitnessLogs[dateStr][habitType] = !state.fitnessLogs[dateStr][habitType];
+    saveState();
 };
+
+function renderFitnessList() {
+    const container = document.getElementById('fitness-matrix');
+    if(!container) return;
+    
+    // Header setup
+    let html = `
+        <div class="habit-day-col" style="align-items:flex-start; margin-right:12px;">
+            <div style="height:28px;"></div>
+            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Steps <span style="font-size:0.65rem">(${state.fitnessTargets.steps})</span></div>
+            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Water <span style="font-size:0.65rem">(${state.fitnessTargets.water}L)</span></div>
+            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Protein <span style="font-size:0.65rem">(${state.fitnessTargets.protein}g)</span></div>
+        </div>
+    `;
+    
+    // Render last 7 days
+    for (let i = 6; i >= 0; i--) {
+        const dStr = getLocalISODate(-i);
+        const dateObj = new Date(dStr);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayNum = dateObj.getDate();
+        
+        const log = state.fitnessLogs[dStr] || { steps: false, water: false, protein: false };
+        
+        html += `
+        <div class="habit-day-col">
+            <div class="text-center" style="height:28px;">
+                <div class="text-xs text-secondary font-bold">${dayName}</div>
+                <div class="text-sm font-medium ${i===0 ? 'text-primary' : ''}">${dayNum}</div>
+            </div>
+            <div class="habit-circle ${log.steps ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'steps')">${log.steps?'✓':''}</div>
+            <div class="habit-circle ${log.water ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'water')">${log.water?'✓':''}</div>
+            <div class="habit-circle ${log.protein ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'protein')">${log.protein?'✓':''}</div>
+        </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
 
 // --- MODULE: TASKS & NOTES ---
 window.setTNView = function(view) {
@@ -686,7 +725,8 @@ window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorag
 
 window.exportCSV = function() {
     if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
+";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     sorted.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
@@ -695,7 +735,8 @@ window.exportCSV = function() {
         if (e.isSplit && e.splitData) {
             pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"\n`;
+        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
+`;
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
@@ -725,7 +766,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; // Safe merge
+            state = { ...state, ...parsed }; 
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
@@ -742,6 +783,13 @@ function renderAll() {
     renderTasksAndNotes();
     if (document.getElementById('view-settlements').classList.contains('active')) renderSettlementsTab();
     if (document.getElementById('view-analytics').classList.contains('active')) renderAnalytics();
+    
+    // Auto-populate edit project modal targets
+    if (document.getElementById('fit-tgt-steps')) {
+        document.getElementById('fit-tgt-steps').value = state.fitnessTargets.steps;
+        document.getElementById('fit-tgt-water').value = state.fitnessTargets.water;
+        document.getElementById('fit-tgt-protein').value = state.fitnessTargets.protein;
+    }
 }
 
 function renderHome() {
@@ -796,114 +844,20 @@ function renderHome() {
     `}).join('') || '<p class="text-xs text-secondary p-sm">No active projects</p>';
 }
 
-function renderProjectsList() {
-    const container = document.getElementById('projects-list-container');
-    if(!container) return;
-    if(state.projects.length === 0) {
-        container.innerHTML = `<div class="empty-state">No projects created yet.</div>`; return;
-    }
-    container.innerHTML = state.projects.map(p => {
-        const spent = p.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-        let pct = p.targetBudget ? Math.min(100, (spent/p.targetBudget)*100) : 0;
-        return `
-        <div class="card p-md clickable" onclick="openProjectDetail('${p.id}')">
-            <div class="flex-between align-center mb-sm">
-                <h3 class="m-0">${p.name}</h3>
-                <span class="badge ${p.status==='Completed'?'badge-success':'badge-primary'}">${p.status}</span>
-            </div>
-            <div class="flex-between text-sm mb-xs">
-                <span class="text-secondary">Spent: ${formatINR(spent)}</span>
-                <span class="text-secondary">Budget: ${formatINR(p.targetBudget)}</span>
-            </div>
-            <div class="progress-bg"><div class="progress-fill ${pct>90?'danger':''}" style="width:${pct}%"></div></div>
-        </div>
-        `;
-    }).join('');
-}
-
-function renderProjectTransactions(id) {
-    const p = state.projects.find(x => x.id === id);
-    const container = document.getElementById('project-tx-list');
-    if(!p || p.transactions.length === 0) {
-        container.innerHTML = '<div class="empty-state">No transactions yet.</div>'; return;
-    }
-    const sorted = [...p.transactions].sort((a,b) => new Date(b.date) - new Date(a.date));
-    container.innerHTML = sorted.map(tx => {
-        let color = 'text-primary';
-        if(tx.type==='allocation' || tx.type==='loan') color = 'text-success';
-        return `
-        <div class="card p-sm flex-between align-center mb-xs clickable" onclick="openProjectTxModal('${tx.id}')">
-            <div>
-                <div class="font-medium text-sm">${tx.desc}</div>
-                <div class="text-xs text-secondary">${tx.date} • ${tx.type.toUpperCase()}</div>
-            </div>
-            <strong class="${color} text-sm">${formatINR(tx.amount)}</strong>
-        </div>
-    `}).join('');
-}
-
-function renderFitnessList() {
-    const container = document.getElementById('fitness-list-container');
-    if(!container) return;
-    if(state.fitness.length === 0) {
-        container.innerHTML = '<div class="empty-state">No fitness logs yet.</div>'; return;
-    }
-    const sorted = [...state.fitness].sort((a,b) => new Date(b.date) - new Date(a.date));
-    container.innerHTML = sorted.map(f => `
-        <div class="card p-md mb-xs">
-            <div class="font-bold border-bottom pb-xs mb-sm">${f.date}</div>
-            <div class="grid-2 gap-sm text-sm">
-                ${f.weight ? `<div><span class="text-secondary">Weight:</span> ${f.weight}kg</div>` : ''}
-                ${f.steps ? `<div><span class="text-secondary">Steps:</span> ${f.steps}</div>` : ''}
-                ${f.workout ? `<div><span class="text-secondary">Workout:</span> ${f.workout}</div>` : ''}
-                ${f.water ? `<div><span class="text-secondary">Water:</span> ${f.water}L</div>` : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-function renderTasksAndNotes() {
-    const tc = document.getElementById('tasks-list-container');
-    const nc = document.getElementById('notes-list-container');
-    if(!tc || !nc) return;
-    
-    // Tasks
-    const pending = state.tasks.filter(t=>!t.completed);
-    const done = state.tasks.filter(t=>t.completed);
-    let tHtml = pending.map(t => `
-        <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm shadow-sm mb-xs">
-            <input type="checkbox" class="task-checkbox" onchange="toggleTask('${t.id}')">
-            <div class="flex-1 text-sm font-medium">${t.title} ${t.dueDate ? `<span class="text-xs text-danger ml-sm">${t.dueDate}</span>`:''}</div>
-            <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
-        </div>
-    `).join('');
-    if(done.length > 0) {
-        tHtml += `<div class="text-xs text-secondary font-bold mt-md mb-xs">COMPLETED</div>`;
-        tHtml += done.map(t => `
-            <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm mb-xs" style="opacity:0.6">
-                <input type="checkbox" class="task-checkbox" checked onchange="toggleTask('${t.id}')">
-                <div class="flex-1 text-sm text-secondary" style="text-decoration:line-through">${t.title}</div>
-                <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
-            </div>
-        `).join('');
-    }
-    tc.innerHTML = tHtml || '<div class="empty-state p-md">No tasks.</div>';
-    
-    // Notes
-    nc.innerHTML = state.notes.map(n => `
-        <div class="card p-md clickable flex-col" onclick="openNoteModal('${n.id}')">
-            <h3 class="m-0 text-sm mb-xs">${n.title}</h3>
-            <p class="text-xs text-secondary" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${n.content}</p>
-        </div>
-    `).join('') || '<div class="empty-state p-md" style="grid-column: span 2">No notes.</div>';
-}
-
-// ... [Expense List & Settlement Rendering logic remains strictly unchanged for reliability] ...
 window.renderExpensesListFull = function() {
     const list = document.getElementById('expenses-list');
     if (!list) return;
-    const searchTerm = (document.getElementById('expense-search')?.value || '').toLowerCase();
-    const monthTerm = document.getElementById('expense-month')?.value || '';
+    
+    const searchInput = document.getElementById('expense-search');
+    const monthInput = document.getElementById('expense-month');
+    
+    // Auto-populate month input if blank
+    if (!monthInput.value) {
+        monthInput.value = getLocalISODate().slice(0, 7);
+    }
+    
+    const searchTerm = (searchInput?.value || '').toLowerCase();
+    const monthTerm = monthInput.value || '';
     
     let filtered = state.expenses;
     if (searchTerm) filtered = filtered.filter(e => e.desc.toLowerCase().includes(searchTerm) || (e.tags||'').toLowerCase().includes(searchTerm));
