@@ -10,33 +10,46 @@ const PIN_KEY = 'pocketSplit_accessCode';
 let state = {
     expenses: [],
     people: [],
-    categories: [],
+    categories: [
+        { id: 'c_rent', name: 'Rent', color: '#EF4444' },
+        { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
+        { id: 'c_pers', name: 'Personal', color: '#10B981' },
+        { id: 'c_mob', name: 'Mobile', color: '#3B82F6' },
+        { id: 'c_ent', name: 'Entertainment', color: '#8B5CF6' },
+        { id: 'c_trip', name: 'Trip', color: '#EC4899' },
+        { id: 'c_trans', name: 'Transport', color: '#6366F1' },
+        { id: 'c_med', name: 'Medicines', color: '#14B8A6' },
+        { id: 'c_food', name: 'Food', color: '#F43F5E' },
+        { id: 'c_wat', name: 'Water', color: '#0EA5E9' },
+        { id: 'c_tea', name: 'Tea/Coffee', color: '#D97706' },
+        { id: 'c_misc', name: 'Miscellaneous', color: '#6B7280' }
+    ],
     budget: 0,
-    projects: [], // [{ id, name, targetBudget, startDate, status, transactions: [] }]
+    projects: [], 
     fitnessTargets: { steps: 10000, water: 3, protein: 120 },
-    fitnessLogs: {}, // { '2026-10-18': { steps: true, water: false, protein: true } }
-    tasks: [], // [{ id, title, dueDate, completed }]
-    notes: [] // [{ id, title, content, updatedAt }]
+    fitnessLogs: {}, 
+    tasks: [], 
+    notes: [] 
 };
 
 let currentSplitType = 'equal';
-let splitDataState = []; 
+let splitDataState = [];  
 let currentProjectViewId = null;
-let settlementView = 'expense'; 
-let settlementFilter = 'all'; 
-let expandedExpenses = {}; 
-let pendingSavePayload = null; 
+let settlementView = 'expense';  
+let settlementFilter = 'all';  
+let expandedExpenses = {};  
+let pendingSavePayload = null;  
 
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
     
-    // Automatically set expense month input to current month if it exists and is empty
+    // Auto-populate month immediately so view isn't blank
     const mInput = document.getElementById('expense-month');
     if (mInput && !mInput.value) {
         mInput.value = getLocalISODate().slice(0, 7);
     }
     
-    if (!localStorage.getItem(PIN_KEY)) localStorage.setItem(PIN_KEY, '1234'); 
+    if (!localStorage.getItem(PIN_KEY)) localStorage.setItem(PIN_KEY, '1234');  
     const savedCode = localStorage.getItem(PIN_KEY);
     if (savedCode && !window.POCKETSPLIT_AUTH.isUnlocked) {
         document.getElementById('login-screen').classList.add('active');
@@ -81,7 +94,7 @@ function formatTime(isoString) { return new Date(isoString).toLocaleTimeString('
 
 function getRelativeDateLabel(dateString) {
     const today = new Date();
-    const targetDate = new Date(dateString); 
+    const targetDate = new Date(dateString);  
     const todayNum = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
     const targetNum = Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const diffDays = (todayNum - targetNum) / (1000 * 60 * 60 * 24);
@@ -98,18 +111,21 @@ function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             state = { ...state, ...parsed };
-            state.expenses = state.expenses.map(e => ({
+            state.expenses = (state.expenses || []).map(e => ({
                 ...e, amount: parseFloat(e.amount) || 0, gpayRequestStatus: e.gpayRequestStatus || 'not_sent',
-                gpayRequestSentAt: e.gpayRequestSentAt || null, paidBy: e.paidBy || 'you', notes: e.notes || '', tags: e.tags || '', 
+                gpayRequestSentAt: e.gpayRequestSentAt || null, paidBy: e.paidBy || 'you', notes: e.notes || '', tags: e.tags || '',  
                 splitData: e.splitData ? e.splitData.map(s => ({...s, share: parseFloat(s.share) || 0})) : null,
                 createdAt: e.createdAt || new Date().toISOString(), updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
+            
+            // Fix Crash: Map empty array if missing
             state.projects = state.projects || [];
+            state.projects.forEach(p => p.transactions = p.transactions || []);
             
             if (Array.isArray(state.fitness)) {
                 state.fitnessLogs = {};
                 state.fitnessTargets = { steps: 10000, water: 3, protein: 120 };
-                state.fitness = undefined; 
+                state.fitness = undefined;  
             } else {
                 state.fitnessLogs = state.fitnessLogs || {};
                 state.fitnessTargets = state.fitnessTargets || { steps: 10000, water: 3, protein: 120 };
@@ -117,12 +133,27 @@ function loadState() {
             
             state.tasks = state.tasks || [];
             state.notes = state.notes || [];
+            
+            // Only overwrite categories if completely empty to allow user additions
             if (!state.categories || state.categories.length === 0) {
-                state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
+                state.categories = [
+                    { id: 'c_rent', name: 'Rent', color: '#EF4444' },
+                    { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
+                    { id: 'c_pers', name: 'Personal', color: '#10B981' },
+                    { id: 'c_mob', name: 'Mobile', color: '#3B82F6' },
+                    { id: 'c_ent', name: 'Entertainment', color: '#8B5CF6' },
+                    { id: 'c_trip', name: 'Trip', color: '#EC4899' },
+                    { id: 'c_trans', name: 'Transport', color: '#6366F1' },
+                    { id: 'c_med', name: 'Medicines', color: '#14B8A6' },
+                    { id: 'c_food', name: 'Food', color: '#F43F5E' },
+                    { id: 'c_wat', name: 'Water', color: '#0EA5E9' },
+                    { id: 'c_tea', name: 'Tea/Coffee', color: '#D97706' },
+                    { id: 'c_misc', name: 'Miscellaneous', color: '#6B7280' }
+                ];
             }
         }
     } catch (e) {
-        state.categories = [{ id: 'c1', name: 'General', color: '#5B5FEF' }];
+        console.error("Storage load failed");
     }
 }
 
@@ -138,15 +169,7 @@ window.switchTab = function(tabId) {
         if (n.dataset.target === tabId) n.classList.add('active');
         else n.classList.remove('active');
     });
-    
-    // Explicit renders based on tab to ensure logic evaluates freshly
-    if (tabId === 'home') renderHome();
-    if (tabId === 'expenses') renderExpensesListFull();
-    if (tabId === 'projects') renderProjectsList();
-    if (tabId === 'fitness') renderFitnessList();
-    if (tabId === 'tasks') renderTasksAndNotes();
-    if (tabId === 'settlements') renderSettlementsTab();
-    if (tabId === 'analytics') renderAnalytics();
+    renderAll();
 };
 
 window.toggleTheme = function() {
@@ -482,23 +505,32 @@ window.openProjectModal = function(id = '') {
 
 window.saveProject = function(e) {
     e.preventDefault();
-    const id = document.getElementById('proj-id').value || 'proj_' + Date.now();
-    const name = document.getElementById('proj-name').value.trim();
-    const targetBudget = roundToTwo(parseFloat(document.getElementById('proj-budget').value) || 0);
-    const startDate = document.getElementById('proj-date').value;
-    const status = document.getElementById('proj-status').value;
-    
-    const proj = { id, name, targetBudget, startDate, status, transactions: [] };
-    const existingIdx = state.projects.findIndex(x => x.id === id);
-    
-    if (existingIdx >= 0) {
-        proj.transactions = state.projects[existingIdx].transactions; // Preserve tx
-        state.projects[existingIdx] = proj;
-    } else {
-        state.projects.push(proj);
+    try {
+        const id = document.getElementById('proj-id').value || 'proj_' + Date.now();
+        const name = document.getElementById('proj-name').value.trim();
+        const targetBudget = roundToTwo(parseFloat(document.getElementById('proj-budget').value) || 0);
+        const startDate = document.getElementById('proj-date').value;
+        const status = document.getElementById('proj-status').value;
+        
+        const proj = { id, name, targetBudget, startDate, status, transactions: [] };
+        const existingIdx = state.projects.findIndex(x => x.id === id);
+        
+        if (existingIdx >= 0) {
+            proj.transactions = state.projects[existingIdx].transactions || [];
+            state.projects[existingIdx] = proj;
+        } else {
+            state.projects.push(proj);
+        }
+        
+        saveState(); 
+        closeAllModals(); 
+        showToast("Project saved");
+        
+        if(currentProjectViewId === id) openProjectDetail(id);
+        else switchTab('projects'); 
+    } catch (err) {
+        alert("Error saving project: " + err.message);
     }
-    saveState(); closeAllModals(); showToast("Project saved");
-    if(currentProjectViewId === id) openProjectDetail(id);
 };
 
 window.deleteProject = function() {
@@ -513,7 +545,8 @@ window.openProjectDetail = function(id) {
     if(!p) return;
     
     document.getElementById('pd-title').innerText = p.name;
-    const totalSpent = p.transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const txs = p.transactions || [];
+    const totalSpent = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount)||0), 0);
     document.getElementById('pd-amounts').innerText = `${formatINR(totalSpent)} / ${formatINR(p.targetBudget)}`;
     
     let pct = 0;
@@ -531,7 +564,7 @@ window.openProjectDetail = function(id) {
 window.openProjectTxModal = function(txId = '') {
     if(!currentProjectViewId) return;
     const p = state.projects.find(x => x.id === currentProjectViewId);
-    const tx = p.transactions.find(x => x.id === txId);
+    const tx = (p.transactions || []).find(x => x.id === txId);
     
     document.getElementById('ptx-id').value = txId;
     document.getElementById('ptx-type').value = tx ? tx.type : 'expense';
@@ -556,6 +589,8 @@ window.saveProjectTx = function(e) {
     const date = document.getElementById('ptx-date').value;
     
     const tx = { id, type, amount, desc, date };
+    state.projects[pIdx].transactions = state.projects[pIdx].transactions || [];
+    
     const txIdx = state.projects[pIdx].transactions.findIndex(x => x.id === id);
     if(txIdx >= 0) state.projects[pIdx].transactions[txIdx] = tx;
     else state.projects[pIdx].transactions.push(tx);
@@ -567,7 +602,7 @@ window.deleteProjectTx = function() {
     if(!currentProjectViewId) return;
     const pIdx = state.projects.findIndex(x => x.id === currentProjectViewId);
     const txId = document.getElementById('ptx-id').value;
-    state.projects[pIdx].transactions = state.projects[pIdx].transactions.filter(x => x.id !== txId);
+    state.projects[pIdx].transactions = (state.projects[pIdx].transactions || []).filter(x => x.id !== txId);
     saveState(); closeAllModals(); openProjectDetail(currentProjectViewId);
 };
 
@@ -587,40 +622,33 @@ window.toggleFitnessHabit = function(dateStr, habitType) {
 };
 
 function renderFitnessList() {
-    const container = document.getElementById('fitness-matrix');
-    if(!container) return;
-    
-    let html = `
-        <div class="habit-day-col" style="align-items:flex-start; margin-right:12px;">
-            <div style="height:28px;"></div>
-            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Steps <span style="font-size:0.65rem">(${state.fitnessTargets.steps})</span></div>
-            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Water <span style="font-size:0.65rem">(${state.fitnessTargets.water}L)</span></div>
-            <div class="text-xs font-bold text-secondary flex-col align-center" style="height:28px; justify-content:center;">Protein <span style="font-size:0.65rem">(${state.fitnessTargets.protein}g)</span></div>
-        </div>
-    `;
-    
-    for (let i = 6; i >= 0; i--) {
-        const dStr = getLocalISODate(-i);
-        const dateObj = new Date(dStr);
-        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-        const dayNum = dateObj.getDate();
-        
-        const log = state.fitnessLogs[dStr] || { steps: false, water: false, protein: false };
-        
-        html += `
-        <div class="habit-day-col">
-            <div class="text-center" style="height:28px;">
-                <div class="text-xs text-secondary font-bold">${dayName}</div>
-                <div class="text-sm font-medium ${i===0 ? 'text-primary' : ''}">${dayNum}</div>
+    ['steps', 'water', 'protein'].forEach(habit => {
+        const grid = document.getElementById(`habit-grid-${habit}`);
+        if(!grid) return;
+        let html = '';
+        for (let i = 6; i >= 0; i--) {
+            const dStr = getLocalISODate(-i);
+            const dateObj = new Date(dStr);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'narrow' }); 
+            const log = state.fitnessLogs[dStr] || {};
+            const isDone = log[habit];
+            html += `
+            <div class="habit-col">
+                <span class="text-xs text-secondary font-medium">${dayName}</span>
+                <div class="habit-check ${isDone ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', '${habit}')">
+                    ${isDone ? '✓' : ''}
+                </div>
             </div>
-            <div class="habit-circle ${log.steps ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'steps')">${log.steps?'✓':''}</div>
-            <div class="habit-circle ${log.water ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'water')">${log.water?'✓':''}</div>
-            <div class="habit-circle ${log.protein ? 'done' : ''}" onclick="toggleFitnessHabit('${dStr}', 'protein')">${log.protein?'✓':''}</div>
-        </div>
-        `;
-    }
+            `;
+        }
+        grid.innerHTML = html;
+    });
     
-    container.innerHTML = html;
+    if(state.fitnessTargets) {
+        if(document.getElementById('habits-steps-tgt')) document.getElementById('habits-steps-tgt').innerText = `Goal: ${state.fitnessTargets.steps}`;
+        if(document.getElementById('habits-water-tgt')) document.getElementById('habits-water-tgt').innerText = `Goal: ${state.fitnessTargets.water}L`;
+        if(document.getElementById('habits-protein-tgt')) document.getElementById('habits-protein-tgt').innerText = `Goal: ${state.fitnessTargets.protein}g`;
+    }
 }
 
 // --- MODULE: TASKS & NOTES ---
@@ -730,7 +758,8 @@ window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorag
 
 window.exportCSV = function() {
     if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At\n";
+    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
+";
     const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
     sorted.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
@@ -739,7 +768,8 @@ window.exportCSV = function() {
         if (e.isSplit && e.splitData) {
             pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"\n`;
+        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
+`;
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
@@ -769,7 +799,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; // Safe merge
+            state = { ...state, ...parsed }; 
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
@@ -778,23 +808,29 @@ window.importData = function(event) {
 
 // --- RENDERERS ---
 function renderAll() {
-    // Explicit renders based on ACTIVE tab only to prevent layout thrashing
-    const activeTab = document.querySelector('.view.active')?.id;
-    if (activeTab === 'view-home') renderHome();
-    if (activeTab === 'view-expenses') renderExpensesListFull();
-    if (activeTab === 'view-projects') renderProjectsList();
-    if (activeTab === 'view-fitness') renderFitnessList();
-    if (activeTab === 'view-tasks') renderTasksAndNotes();
-    if (activeTab === 'view-settlements') renderSettlementsTab();
-    if (activeTab === 'view-analytics') renderAnalytics();
-    
-    renderCategoriesModal();
-    
-    // Auto-populate edit project modal targets
-    if (document.getElementById('fit-tgt-steps')) {
-        document.getElementById('fit-tgt-steps').value = state.fitnessTargets.steps;
-        document.getElementById('fit-tgt-water').value = state.fitnessTargets.water;
-        document.getElementById('fit-tgt-protein').value = state.fitnessTargets.protein;
+    try {
+        const activeTab = document.querySelector('.view.active')?.id || 'view-home';
+        
+        if (activeTab === 'view-home') renderHome();
+        else if (activeTab === 'view-expenses') renderExpensesListFull();
+        else if (activeTab === 'view-projects') renderProjectsList();
+        else if (activeTab === 'view-project-detail') {
+            if (currentProjectViewId) openProjectDetail(currentProjectViewId);
+        }
+        else if (activeTab === 'view-fitness') renderFitnessList();
+        else if (activeTab === 'view-tasks') renderTasksAndNotes();
+        else if (activeTab === 'view-settlements') renderSettlementsTab();
+        else if (activeTab === 'view-analytics') renderAnalytics();
+        
+        renderCategoriesModal();
+        
+        if (document.getElementById('fit-tgt-steps') && state.fitnessTargets) {
+            document.getElementById('fit-tgt-steps').value = state.fitnessTargets.steps || 10000;
+            document.getElementById('fit-tgt-water').value = state.fitnessTargets.water || 3;
+            document.getElementById('fit-tgt-protein').value = state.fitnessTargets.protein || 120;
+        }
+    } catch (e) {
+        console.error("Render loop failed:", e);
     }
 }
 
@@ -842,7 +878,8 @@ function renderHome() {
     const activeProjs = state.projects.filter(p => p.status === 'Active');
     const plist = document.getElementById('dash-projects-list');
     plist.innerHTML = activeProjs.slice(0,2).map(p => {
-        const spent = p.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+        const txs = p.transactions || [];
+        const spent = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
         let pct = p.targetBudget ? Math.min(100, (spent/p.targetBudget)*100) : 0;
         return `
         <div class="card p-sm mb-xs clickable" onclick="openProjectDetail('${p.id}')">
@@ -859,13 +896,12 @@ window.renderExpensesListFull = function() {
     const searchInput = document.getElementById('expense-search');
     const monthInput = document.getElementById('expense-month');
     
-    // Auto-populate month input if blank
-    if (!monthInput.value) {
+    if (monthInput && !monthInput.value) {
         monthInput.value = getLocalISODate().slice(0, 7);
     }
     
     const searchTerm = (searchInput?.value || '').toLowerCase();
-    const monthTerm = monthInput.value || '';
+    const monthTerm = monthInput?.value || '';
     
     let filtered = state.expenses;
     if (searchTerm) filtered = filtered.filter(e => e.desc.toLowerCase().includes(searchTerm) || (e.tags||'').toLowerCase().includes(searchTerm));
@@ -952,17 +988,107 @@ function renderSettlementsTab() {
 }
 
 function renderAnalytics() {
-    const currentMonth = new Date().toISOString().slice(0,7); 
-    let monthSpend = 0; let categoryTotals = {};
+    const tagFilterEl = document.getElementById('analytics-tag-search');
+    const tagFilter = tagFilterEl ? tagFilterEl.value.trim().toLowerCase() : '';
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = now.getMonth() + 1;
+    const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+    
+    let prevYear = currentYear;
+    let prevMonthNum = currentMonthNum - 1;
+    if (prevMonthNum === 0) {
+        prevMonthNum = 12;
+        prevYear -= 1;
+    }
+    const prevMonthStr = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
+    
+    let monthSpend = 0;
+    let prevMonthSpend = 0;
+    let categoryTotals = {};
+    
     state.categories.forEach(c => categoryTotals[c.id] = { name: c.name, color: c.color, amount: 0 });
+
     state.expenses.forEach(exp => {
-        if (exp.date.startsWith(currentMonth)) {
-            let myCost = exp.amount;
-            if (exp.isSplit && exp.splitData) { const myS = exp.splitData.find(s=>s.personId==='you'); myCost = myS?myS.share:0; } 
-            else if (exp.paidBy !== 'you') myCost = 0;
+        if (tagFilter && !(exp.tags || '').toLowerCase().includes(tagFilter)) return;
+
+        let myCost = exp.amount;
+        const paidBy = exp.paidBy || 'you';
+        
+        if (exp.isSplit && exp.splitData) {
+            const myShareObj = exp.splitData.find(s => s.personId === 'you');
+            myCost = myShareObj ? myShareObj.share : 0;
+        } else if (paidBy !== 'you') {
+            myCost = 0; 
+        }
+        
+        if (exp.date.startsWith(currentMonthStr)) {
             monthSpend += myCost;
             if (categoryTotals[exp.category]) categoryTotals[exp.category].amount += myCost;
+        } else if (exp.date.startsWith(prevMonthStr)) {
+            prevMonthSpend += myCost;
         }
     });
-    document.getElementById('analytics-total').innerText = formatINR(monthSpend);
+
+    const totalEl = document.getElementById('analytics-total');
+    if (totalEl) totalEl.innerText = formatINR(monthSpend);
+    
+    const momEl = document.getElementById('analytics-mom');
+    if (momEl) {
+        if (prevMonthSpend === 0 && monthSpend > 0) {
+            momEl.innerHTML = '<span class="text-danger">▲ 100% from last month</span>';
+        } else if (prevMonthSpend === 0 && monthSpend === 0) {
+            momEl.innerHTML = '<span class="text-secondary">No change from last month</span>';
+        } else {
+            const diff = monthSpend - prevMonthSpend;
+            const pct = (diff / prevMonthSpend) * 100;
+            if (pct > 0) {
+                momEl.innerHTML = `<span class="text-danger">▲ ${pct.toFixed(1)}% from last month</span>`;
+            } else if (pct < 0) {
+                momEl.innerHTML = `<span class="text-success">▼ ${Math.abs(pct).toFixed(1)}% from last month</span>`;
+            } else {
+                momEl.innerHTML = `<span class="text-secondary">No change from last month</span>`;
+            }
+        }
+    }
+
+    const pieChart = document.getElementById('pie-chart');
+    const pieLegend = document.getElementById('pie-legend');
+    if (!pieChart || !pieLegend) return;
+
+    if (monthSpend === 0) {
+        pieChart.style.background = 'var(--border)';
+        pieLegend.innerHTML = '<p class="text-center text-secondary text-sm mt-md">No spending matches this filter.</p>';
+        return;
+    }
+
+    let gradientStr = [];
+    let currentAngle = 0;
+    let legendHtml = '';
+
+    const catArr = Object.values(categoryTotals).filter(c => c.amount > 0).sort((a,b) => b.amount - a.amount);
+
+    catArr.forEach(c => {
+        const percentage = (c.amount / monthSpend) * 100;
+        const angle = (percentage / 100) * 360;
+        gradientStr.push(`${c.color} ${currentAngle}deg ${currentAngle + angle}deg`);
+        currentAngle += angle;
+
+        legendHtml += `
+            <div class="flex-between align-center border-bottom py-sm clickable" onclick="openCategoryDetail('${c.id || Object.keys(categoryTotals).find(k=>categoryTotals[k]===c)}', '${c.name}')">
+                <div class="flex-row align-center gap-sm">
+                    <span class="legend-dot" style="background-color: ${c.color}"></span>
+                    <span class="text-sm font-medium">${c.name}</span>
+                </div>
+                <div class="flex-col" style="align-items: flex-end;">
+                    <span class="font-bold text-sm">${formatINR(c.amount)}</span>
+                    <span class="text-xs text-secondary">${percentage.toFixed(1)}%</span>
+                </div>
+            </div>
+        `;
+    });
+
+    pieChart.style.background = `conic-gradient(${gradientStr.join(', ')})`;
+    pieLegend.innerHTML = legendHtml;
 }
