@@ -10,20 +10,7 @@ const PIN_KEY = 'pocketSplit_accessCode';
 let state = {
     expenses: [],
     people: [],
-    categories: [
-        { id: 'c_rent', name: 'Rent', color: '#EF4444' },
-        { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
-        { id: 'c_pers', name: 'Personal', color: '#10B981' },
-        { id: 'c_mob', name: 'Mobile', color: '#3B82F6' },
-        { id: 'c_ent', name: 'Entertainment', color: '#8B5CF6' },
-        { id: 'c_trip', name: 'Trip', color: '#EC4899' },
-        { id: 'c_trans', name: 'Transport', color: '#6366F1' },
-        { id: 'c_med', name: 'Medicines', color: '#14B8A6' },
-        { id: 'c_food', name: 'Food', color: '#F43F5E' },
-        { id: 'c_wat', name: 'Water', color: '#0EA5E9' },
-        { id: 'c_tea', name: 'Tea/Coffee', color: '#D97706' },
-        { id: 'c_misc', name: 'Miscellaneous', color: '#6B7280' }
-    ],
+    categories: [],
     budget: 0,
     projects: [], 
     fitnessTargets: { steps: 10000, water: 3, protein: 120 },
@@ -119,9 +106,9 @@ function loadState() {
                 createdAt: e.createdAt || new Date().toISOString(), updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
             
-            // Fix Crash: Map empty array if missing
-            state.projects = state.projects || [];
-            state.projects.forEach(p => p.transactions = p.transactions || []);
+            // Fix Arrays
+            state.projects = Array.isArray(state.projects) ? state.projects : [];
+            state.projects.forEach(p => p.transactions = Array.isArray(p.transactions) ? p.transactions : []);
             
             if (Array.isArray(state.fitness)) {
                 state.fitnessLogs = {};
@@ -132,11 +119,10 @@ function loadState() {
                 state.fitnessTargets = state.fitnessTargets || { steps: 10000, water: 3, protein: 120 };
             }
             
-            state.tasks = state.tasks || [];
-            state.notes = state.notes || [];
+            state.tasks = Array.isArray(state.tasks) ? state.tasks : [];
+            state.notes = Array.isArray(state.notes) ? state.notes : [];
             
-            // Only overwrite categories if completely empty to allow user additions
-            if (!state.categories || state.categories.length === 0) {
+            if (!state.categories || state.categories.length === 0 || (state.categories.length === 1 && state.categories[0].name === 'General')) {
                 state.categories = [
                     { id: 'c_rent', name: 'Rent', color: '#EF4444' },
                     { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
@@ -154,7 +140,7 @@ function loadState() {
             }
         }
     } catch (e) {
-        console.error("Storage load failed");
+        console.error("Storage load failed", e);
     }
 }
 
@@ -476,7 +462,7 @@ window.deleteExpenseFromModal = function() {
 };
 
 window.triggerQuickAdd = function() {
-    const amount = prompt("Quick Add Expense\nEnter amount (₹):");
+    const amount = prompt("Quick Add Expense\\nEnter amount (₹):");
     if (!amount) return;
     const parsedAmount = roundToTwo(parseFloat(amount));
     if (isNaN(parsedAmount) || parsedAmount <= 0) return alert("Invalid amount.");
@@ -767,32 +753,59 @@ window.removeBudget = function() { state.budget = 0; saveState(); closeAllModals
 window.clearAllData = function() { if(confirm("Delete ALL data?")) { localStorage.clear(); window.location.reload(); } };
 
 window.exportCSV = function() {
-    if (state.expenses.length === 0) return alert("No expenses to export.");
-    let csvContent = "Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes,Created At,Updated At
-";
-    const sorted = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
-    sorted.forEach(e => {
+    if (state.expenses.length === 0 && state.projects.length === 0 && state.tasks.length === 0) return alert("No data to export.");
+    
+    let lines = [];
+    
+    // Expenses
+    lines.push("--- EXPENSES ---");
+    lines.push("Date,Time,Description,Category,Paid By,Amount,Split Type,Participants,Tags,Notes");
+    const sortedExp = [...state.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+    sortedExp.forEach(e => {
         const catObj = state.categories.find(c => c.id === e.category);
         const payerObj = e.paidBy === 'you' ? {name:'You'} : state.people.find(p => p.id === e.paidBy);
         let pStr = '';
         if (e.isSplit && e.splitData) {
-            pStr = `"${e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (₹${s.share.toFixed(2)})`).join(', ')}"`;
+            pStr = e.splitData.map(s => `${s.personId==='you'?'You':(state.people.find(p=>p.id===s.personId)?.name||'Unknown')} (Rs.${s.share.toFixed(2)})`).join('; ');
         }
-        csvContent += `${e.date},${formatTime(e.updatedAt||e.createdAt)},"${e.desc.replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}",${e.amount.toFixed(2)},${e.isSplit?e.splitType:'None'},${pStr},"${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}","${new Date(e.createdAt).toLocaleString()}","${new Date(e.updatedAt).toLocaleString()}"
-`;
+        lines.push(`"${e.date}","${formatTime(e.updatedAt||e.createdAt)}","${(e.desc||'').replace(/"/g,'""')}","${catObj?catObj.name:'Unknown'}","${payerObj?payerObj.name:'Unknown'}","${e.amount.toFixed(2)}","${e.isSplit?e.splitType:'None'}","${pStr}","${(e.tags||'').replace(/"/g,'""')}","${(e.notes||'').replace(/"/g,'""')}"`);
     });
-    
-    // Add Projects to CSV
-    csvContent += "
 
---- PROJECTS & GOALS ---
-Project Name,Status,Target Budget,Start Date
-";
+    // Projects
+    lines.push("");
+    lines.push("--- PROJECTS & GOALS ---");
+    lines.push("Name,Status,Target Budget,Spent,Start Date");
     state.projects.forEach(p => {
-        csvContent += `"${p.name.replace(/"/g,'""')}",${p.status},${p.targetBudget},${p.startDate}
-`;
+        const spent = (p.transactions || []).filter(t=>t.type==='expense').reduce((sum, t) => sum + (parseFloat(t.amount)||0), 0);
+        lines.push(`"${(p.name||'').replace(/"/g,'""')}","${p.status}","${p.targetBudget}","${spent}","${p.startDate}"`);
     });
-    
+
+    // Fitness
+    lines.push("");
+    lines.push("--- FITNESS HABITS ---");
+    lines.push("Date,Steps,Water,Protein");
+    Object.keys(state.fitnessLogs).sort((a,b) => new Date(b) - new Date(a)).forEach(dateStr => {
+        const log = state.fitnessLogs[dateStr];
+        lines.push(`"${dateStr}","${log.steps?'Yes':'No'}","${log.water?'Yes':'No'}","${log.protein?'Yes':'No'}"`);
+    });
+
+    // Tasks
+    lines.push("");
+    lines.push("--- TASKS ---");
+    lines.push("Title,Due Date,Completed");
+    state.tasks.forEach(t => {
+        lines.push(`"${(t.title||'').replace(/"/g,'""')}","${t.dueDate||'None'}","${t.completed?'Yes':'No'}"`);
+    });
+
+    // Notes
+    lines.push("");
+    lines.push("--- NOTES ---");
+    lines.push("Title,Content,Updated At");
+    state.notes.forEach(n => {
+        lines.push(`"${(n.title||'').replace(/"/g,'""')}","${(n.content||'').replace(/"/g,'""')}","${new Date(n.updatedAt).toLocaleString()}"`);
+    });
+
+    const csvContent = lines.join("\n");
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
     a.download = `PocketSplit_Export_${new Date().toISOString().split('T')[0]}.csv`;
@@ -821,7 +834,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; 
+            state = { ...state, ...parsed }; // Safe merge
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
@@ -1162,16 +1175,36 @@ function renderAnalytics() {
     pieLegend.innerHTML = legendHtml;
 }
 
-function renderCategoriesModal() {
-    const list = document.getElementById('category-manage-list');
-    if (!list) return;
-    list.innerHTML = state.categories.map(c => `
-        <div class="list-item p-sm border-bottom flex-between">
-            <div class="flex-row align-center gap-sm">
-                <div style="width:16px;height:16px;border-radius:4px;background:${c.color}"></div>
-                <span>${c.name}</span>
-            </div>
-            <button class="btn-ghost text-danger text-xs" onclick="deleteCategory('${c.id}')">Delete</button>
+function renderTasksAndNotes() {
+    const tc = document.getElementById('tasks-list-container');
+    const nc = document.getElementById('notes-list-container');
+    if(!tc || !nc) return;
+    
+    const pending = state.tasks.filter(t=>!t.completed);
+    const done = state.tasks.filter(t=>t.completed);
+    let tHtml = pending.map(t => `
+        <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm shadow-sm mb-xs">
+            <input type="checkbox" class="task-checkbox" onchange="toggleTask('${t.id}')">
+            <div class="flex-1 text-sm font-medium">${t.title} ${t.dueDate ? `<span class="text-xs text-danger ml-sm">${t.dueDate}</span>`:''}</div>
+            <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
         </div>
     `).join('');
+    if(done.length > 0) {
+        tHtml += `<div class="text-xs text-secondary font-bold mt-md mb-xs">COMPLETED</div>`;
+        tHtml += done.map(t => `
+            <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm mb-xs" style="opacity:0.6">
+                <input type="checkbox" class="task-checkbox" checked onchange="toggleTask('${t.id}')">
+                <div class="flex-1 text-sm text-secondary" style="text-decoration:line-through">${t.title}</div>
+                <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
+            </div>
+        `).join('');
+    }
+    tc.innerHTML = tHtml || '<div class="empty-state p-md">No tasks.</div>';
+    
+    nc.innerHTML = state.notes.map(n => `
+        <div class="card p-md clickable flex-col" onclick="openNoteModal('${n.id}')">
+            <h3 class="m-0 text-sm mb-xs">${n.title}</h3>
+            <p class="text-xs text-secondary" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${n.content}</p>
+        </div>
+    `).join('') || '<div class="empty-state p-md" style="grid-column: span 2">No notes.</div>';
 }
