@@ -118,7 +118,6 @@ function loadState() {
                 createdAt: e.createdAt || new Date().toISOString(), updatedAt: e.updatedAt || e.createdAt || new Date().toISOString()
             }));
             
-            // Fix Crash: Map empty array if missing
             state.projects = state.projects || [];
             state.projects.forEach(p => p.transactions = p.transactions || []);
             
@@ -134,8 +133,7 @@ function loadState() {
             state.tasks = state.tasks || [];
             state.notes = state.notes || [];
             
-            // Only overwrite categories if completely empty to allow user additions
-            if (!state.categories || state.categories.length === 0) {
+            if (!state.categories || state.categories.length === 0 || (state.categories.length === 1 && state.categories[0].name === 'General')) {
                 state.categories = [
                     { id: 'c_rent', name: 'Rent', color: '#EF4444' },
                     { id: 'c_elec', name: 'Electricity', color: '#F59E0B' },
@@ -799,7 +797,7 @@ window.importData = function(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             validateImportedState(parsed);
-            state = { ...state, ...parsed }; 
+            state = { ...state, ...parsed }; // Safe merge
             saveState(); alert("Import successful!"); window.location.reload();
         } catch (err) { alert("Import failed."); }
     };
@@ -887,6 +885,53 @@ function renderHome() {
             <div class="progress-bg"><div class="progress-fill" style="width:${pct}%"></div></div>
         </div>
     `}).join('') || '<p class="text-xs text-secondary p-sm">No active projects</p>';
+}
+
+function renderProjectsList() {
+    const container = document.getElementById('projects-list-container');
+    if(!container) return;
+    if(!state.projects || state.projects.length === 0) {
+        container.innerHTML = `<div class="empty-state">No projects created yet.</div>`; return;
+    }
+    container.innerHTML = state.projects.map(p => {
+        const txs = p.transactions || [];
+        const spent = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+        let pct = p.targetBudget ? Math.min(100, (spent/p.targetBudget)*100) : 0;
+        return `
+        <div class="card p-md mb-sm clickable" onclick="openProjectDetail('${p.id}')">
+            <div class="flex-between align-center mb-sm">
+                <h3 class="m-0">${p.name}</h3>
+                <span class="badge ${p.status==='Completed'?'badge-success':'badge-primary'}">${p.status}</span>
+            </div>
+            <div class="flex-between text-sm mb-xs">
+                <span class="text-secondary">Spent: ${formatINR(spent)}</span>
+                <span class="text-secondary">Budget: ${formatINR(p.targetBudget)}</span>
+            </div>
+            <div class="progress-bg"><div class="progress-fill ${pct>90?'danger':''}" style="width:${pct}%"></div></div>
+        </div>
+        `;
+    }).join('');
+}
+
+function renderProjectTransactions(id) {
+    const p = state.projects.find(x => x.id === id);
+    const container = document.getElementById('project-tx-list');
+    if(!p || !p.transactions || p.transactions.length === 0) {
+        container.innerHTML = '<div class="empty-state">No transactions yet.</div>'; return;
+    }
+    const sorted = [...p.transactions].sort((a,b) => new Date(b.date) - new Date(a.date));
+    container.innerHTML = sorted.map(tx => {
+        let color = 'text-primary';
+        if(tx.type==='allocation' || tx.type==='loan') color = 'text-success';
+        return `
+        <div class="card p-sm flex-between align-center mb-xs clickable" onclick="openProjectTxModal('${tx.id}')">
+            <div>
+                <div class="font-medium text-sm">${tx.desc}</div>
+                <div class="text-xs text-secondary">${tx.date} • ${tx.type.toUpperCase()}</div>
+            </div>
+            <strong class="${color} text-sm">${formatINR(tx.amount)}</strong>
+        </div>
+    `}).join('');
 }
 
 window.renderExpensesListFull = function() {
@@ -1091,4 +1136,38 @@ function renderAnalytics() {
 
     pieChart.style.background = `conic-gradient(${gradientStr.join(', ')})`;
     pieLegend.innerHTML = legendHtml;
+}
+
+function renderTasksAndNotes() {
+    const tc = document.getElementById('tasks-list-container');
+    const nc = document.getElementById('notes-list-container');
+    if(!tc || !nc) return;
+    
+    const pending = state.tasks.filter(t=>!t.completed);
+    const done = state.tasks.filter(t=>t.completed);
+    let tHtml = pending.map(t => `
+        <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm shadow-sm mb-xs">
+            <input type="checkbox" class="task-checkbox" onchange="toggleTask('${t.id}')">
+            <div class="flex-1 text-sm font-medium">${t.title} ${t.dueDate ? `<span class="text-xs text-danger ml-sm">${t.dueDate}</span>`:''}</div>
+            <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
+        </div>
+    `).join('');
+    if(done.length > 0) {
+        tHtml += `<div class="text-xs text-secondary font-bold mt-md mb-xs">COMPLETED</div>`;
+        tHtml += done.map(t => `
+            <div class="flex-row align-center gap-sm p-sm bg-surface border-radius-sm mb-xs" style="opacity:0.6">
+                <input type="checkbox" class="task-checkbox" checked onchange="toggleTask('${t.id}')">
+                <div class="flex-1 text-sm text-secondary" style="text-decoration:line-through">${t.title}</div>
+                <button class="btn-ghost text-xs p-0 text-danger" onclick="deleteTask('${t.id}')">✕</button>
+            </div>
+        `).join('');
+    }
+    tc.innerHTML = tHtml || '<div class="empty-state p-md">No tasks.</div>';
+    
+    nc.innerHTML = state.notes.map(n => `
+        <div class="card p-md clickable flex-col" onclick="openNoteModal('${n.id}')">
+            <h3 class="m-0 text-sm mb-xs">${n.title}</h3>
+            <p class="text-xs text-secondary" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${n.content}</p>
+        </div>
+    `).join('') || '<div class="empty-state p-md" style="grid-column: span 2">No notes.</div>';
 }
